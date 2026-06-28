@@ -32,7 +32,7 @@ async function callAI(prompt, imageBase64=null) {
     ? [{type:"image",source:{type:"base64",media_type:"image/jpeg",data:imageBase64}},{type:"text",text:prompt}]
     : prompt;
   const res = await fetch("https://api.anthropic.com/v1/messages",{
-    method:"POST","Content-Type":"application/json","x-api-key":import.meta.env.VITE_ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"
+    method:"POST","Content-Type":"application/json","x-api-key":import.meta.env.VITE_ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true":import.meta.env.VITE_ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"
     body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:1500,messages:[{role:"user",content}]}),
   });
   const data = await res.json();
@@ -302,7 +302,7 @@ function ModoRefri({profile,isPremium,recipeUtils,onAddToList,C}) {
     try{
       const base64=photoPreview.split(",")[1];
       const res=await fetch("https://api.anthropic.com/v1/messages",{
-        method:"POST","Content-Type":"application/json","x-api-key":import.meta.env.VITE_ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"
+        method:"POST","Content-Type":"application/json","x-api-key":import.meta.env.VITE_ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true":import.meta.env.VITE_ANTHROPIC_KEY,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"
         body:JSON.stringify({model:"claude-sonnet-4-6",max_tokens:400,messages:[{role:"user",content:[
           {type:"image",source:{type:"base64",media_type:"image/jpeg",data:base64}},
           {type:"text",text:"Identifica todos los ingredientes o alimentos en esta imagen. Responde SOLO con una lista separada por comas en español, sin explicaciones. Ejemplo: huevos, jitomate, queso"}
