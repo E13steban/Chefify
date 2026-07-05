@@ -413,6 +413,8 @@ Dame 3 opciones de recetas diferentes. Responde SOLO JSON sin backticks:
 
   // Paso 2: Generar receta completa de la opción elegida
   const selectOption=async(opt)=>{
+    setOptions(null);
+    setLoading(true);
     setError(null);
     const ctx=buildProfileContext(profile);
     const macrosField=isPremium?`"calorias":"X kcal por porción","macros":{"Proteína":"Xg","Carbos":"Xg","Grasa":"Xg"},`:"";
@@ -423,6 +425,7 @@ Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${person
       recipeUtils.addToHistory(r);
       increment();
     }catch{setError("No se pudo generar la receta. Intenta de nuevo.");}
+    finally{setLoading(false);}
   };
 
   const reset=()=>{setRecipe(null);setOptions(null);};
@@ -535,6 +538,8 @@ Dame 3 opciones de recetas diferentes. Responde SOLO JSON sin backticks:
   };
 
   const selectOption=async(opt)=>{
+    setOptions(null);
+    setLoading(true);
     setError(null);
     const ctx=buildProfileContext(profile);
     const macrosField=isPremium?`"calorias":"X kcal por porción","macros":{"Proteína":"Xg","Carbos":"Xg","Grasa":"Xg"},`:"";
@@ -545,6 +550,7 @@ Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${person
       recipeUtils.addToHistory(r);
       increment();
     }catch{setError("No se pudo generar la receta.");}
+    finally{setLoading(false);}
   };
 
   const reset=()=>{setRecipe(null);setOptions(null);};
