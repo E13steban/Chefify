@@ -190,8 +190,7 @@ function LoginScreen({C}) {
   const login = async () => {
     setLoading(true);
     try { await signInWithRedirect(auth, googleProvider); }
-    catch(e) { toast("⚠️ Error al iniciar sesión. Intenta de nuevo."); }
-    finally { setLoading(false); }
+    catch(e) { toast("⚠️ Error al iniciar sesión. Intenta de nuevo."); setLoading(false); }
   };
   return(
     <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px",fontFamily:"Georgia,serif"}}>
@@ -1095,7 +1094,14 @@ export default function App() {
   const recipeUtils=useRecipeUtils(uid);
 
   useEffect(()=>{
-    getRedirectResult(auth).catch(()=>{});
+    getRedirectResult(auth).then(async(result)=>{
+      if(result?.user){
+        const p=await loadFromFirestore(result.user.uid,"profile");
+        if(!p&&result.user.displayName){
+          await saveToFirestore(result.user.uid,"profile",{...DEFAULT_PROFILE,name:result.user.displayName});
+        }
+      }
+    }).catch(()=>{});
     const unsub=onAuthStateChanged(auth,async(u)=>{
       setUser(u);
       if(u){
