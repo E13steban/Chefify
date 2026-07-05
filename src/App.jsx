@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { initializeApp } from "firebase/app";
-import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "firebase/auth";
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from "firebase/firestore";
 
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
@@ -15,7 +15,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const googleProvider = new GoogleAuthProvider();
 
 // ─── TEMA ────────────────────────────────────────────────────────────────────
 const DARK = {
@@ -186,25 +185,59 @@ function StepTimer({step,C}) {
 
 // ─── LOGIN SCREEN ─────────────────────────────────────────────────────────────
 function LoginScreen({C}) {
-  const [loading, setLoading] = useState(false);
-  const login = async () => {
-    setLoading(true);
-    try { await signInWithRedirect(auth, googleProvider); }
-    catch(e) { toast("⚠️ Error al iniciar sesión. Intenta de nuevo."); setLoading(false); }
+  const [email,setEmail]=useState("");
+  const [password,setPassword]=useState("");
+  const [name,setName]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [isRegister,setIsRegister]=useState(false);
+  const [error,setError]=useState("");
+
+  const handleAuth=async()=>{
+    if(!email||!password){setError("Por favor llena todos los campos");return;}
+    if(isRegister&&!name){setError("Por favor escribe tu nombre");return;}
+    setLoading(true);setError("");
+    try{
+      if(isRegister){
+        const cred=await createUserWithEmailAndPassword(auth,email,password);
+        await updateProfile(cred.user,{displayName:name});
+      } else {
+        await signInWithEmailAndPassword(auth,email,password);
+      }
+    }catch(e){
+      if(e.code==="auth/email-already-in-use")setError("Este correo ya está registrado");
+      else if(e.code==="auth/user-not-found"||e.code==="auth/wrong-password"||e.code==="auth/invalid-credential")setError("Correo o contraseña incorrectos");
+      else if(e.code==="auth/weak-password")setError("La contraseña debe tener al menos 6 caracteres");
+      else if(e.code==="auth/invalid-email")setError("El correo no es válido");
+      else setError("Error al iniciar sesión. Intenta de nuevo.");
+    }finally{setLoading(false);}
   };
+
+  const inp={width:"100%",background:C.inputBg,border:`1px solid ${C.border}`,borderRadius:"10px",color:C.text,fontSize:"0.95rem",padding:"12px 14px",outline:"none",fontFamily:"Georgia,serif",boxSizing:"border-box",marginBottom:"10px"};
+
   return(
     <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px",fontFamily:"Georgia,serif"}}>
       <div style={{fontSize:"4rem",marginBottom:"16px"}}>🍳</div>
-      <h1 style={{fontSize:"2rem",fontWeight:"bold",color:C.green,margin:"0 0 8px"}}>Chefify</h1>
-      <p style={{fontSize:"0.9rem",color:C.textMuted,marginBottom:"40px",textAlign:"center"}}>Recetas para todos los mexicanos 🇲🇽</p>
-      <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"20px",padding:"32px 24px",width:"100%",maxWidth:"340px",textAlign:"center"}}>
-        <div style={{fontSize:"1.1rem",fontWeight:"bold",color:C.text,marginBottom:"8px"}}>Bienvenido</div>
-        <p style={{fontSize:"0.82rem",color:C.textMuted,marginBottom:"24px",lineHeight:"1.5"}}>Inicia sesión para guardar tus recetas, favoritos e historial en todos tus dispositivos</p>
-        <button onClick={login} disabled={loading} style={{width:"100%",background:"#fff",border:"1px solid #ddd",borderRadius:"12px",padding:"14px",display:"flex",alignItems:"center",justifyContent:"center",gap:"12px",cursor:"pointer",fontSize:"0.95rem",fontWeight:"bold",color:"#333",fontFamily:"Georgia,serif"}}>
-          <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
-          {loading ? "Iniciando sesión..." : "Continuar con Google"}
+      <h1 style={{fontSize:"2rem",fontWeight:"bold",color:C.green,margin:"0 0 4px"}}>Chefify</h1>
+      <p style={{fontSize:"0.9rem",color:C.textMuted,marginBottom:"32px",textAlign:"center"}}>Recetas para todos los mexicanos 🇲🇽</p>
+      <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"20px",padding:"28px 24px",width:"100%",maxWidth:"340px"}}>
+        <div style={{fontSize:"1.1rem",fontWeight:"bold",color:C.text,marginBottom:"4px",textAlign:"center"}}>
+          {isRegister?"Crear cuenta":"Iniciar sesión"}
+        </div>
+        <p style={{fontSize:"0.78rem",color:C.textMuted,marginBottom:"20px",textAlign:"center",lineHeight:"1.5"}}>
+          {isRegister?"Crea tu cuenta para guardar recetas y favoritos":"Inicia sesión para acceder a tus recetas"}
+        </p>
+        {isRegister&&(
+          <input style={inp} placeholder="Tu nombre" value={name} onChange={e=>setName(e.target.value)}/>
+        )}
+        <input style={inp} placeholder="Correo electrónico" type="email" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/>
+        <input style={inp} placeholder="Contraseña (mín. 6 caracteres)" type="password" value={password} onChange={e=>setPassword(e.target.value)} onKeyDown={e=>e.key==="Enter"&&handleAuth()}/>
+        {error&&<div style={{fontSize:"0.78rem",color:C.accent,marginBottom:"10px",textAlign:"center"}}>{error}</div>}
+        <button onClick={handleAuth} disabled={loading} style={{width:"100%",background:`linear-gradient(135deg,#3a7a3a,#2d5a2d)`,border:"none",borderRadius:"12px",padding:"14px",cursor:"pointer",fontSize:"0.95rem",fontWeight:"bold",color:"#e0ede0",fontFamily:"Georgia,serif"}}>
+          {loading?"Cargando...":(isRegister?"Crear cuenta":"Entrar")}
         </button>
-        <p style={{fontSize:"0.72rem",color:C.textDim,marginTop:"16px"}}>Al continuar aceptas nuestros términos de uso</p>
+        <button onClick={()=>{setIsRegister(!isRegister);setError("");}} style={{width:"100%",background:"transparent",border:"none",color:C.green,cursor:"pointer",fontSize:"0.82rem",marginTop:"14px",fontFamily:"Georgia,serif"}}>
+          {isRegister?"¿Ya tienes cuenta? Inicia sesión":"¿No tienes cuenta? Regístrate"}
+        </button>
       </div>
     </div>
   );
@@ -1094,14 +1127,6 @@ export default function App() {
   const recipeUtils=useRecipeUtils(uid);
 
   useEffect(()=>{
-    getRedirectResult(auth).then(async(result)=>{
-      if(result?.user){
-        const p=await loadFromFirestore(result.user.uid,"profile");
-        if(!p&&result.user.displayName){
-          await saveToFirestore(result.user.uid,"profile",{...DEFAULT_PROFILE,name:result.user.displayName});
-        }
-      }
-    }).catch(()=>{});
     const unsub=onAuthStateChanged(auth,async(u)=>{
       setUser(u);
       if(u){
