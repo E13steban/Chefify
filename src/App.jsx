@@ -300,9 +300,9 @@ function useRecipeUtils() {
   useEffect(()=>{
     (async()=>{
       try{
-        const f=await window.storage.get("chefify-favorites");
+        const f=await localStorage.get("chefify-favorites");
         if(f?.value)setFavorites(JSON.parse(f.value));
-        const h=await window.storage.get("chefify-history");
+        const h=await localStorage.get("chefify-history");
         if(h?.value)setHistory(JSON.parse(h.value));
       }catch{}
     })();
@@ -311,12 +311,12 @@ function useRecipeUtils() {
     const exists=favorites.find(f=>f.nombre===recipe.nombre);
     const nf=exists?favorites.filter(f=>f.nombre!==recipe.nombre):[recipe,...favorites].slice(0,50);
     setFavorites(nf);
-    try{await window.storage.set("chefify-favorites",JSON.stringify(nf));}catch{}
+    try{await localStorage.set("chefify-favorites",JSON.stringify(nf));}catch{}
   };
   const addToHistory=async(recipe)=>{
     const nh=[{...recipe,viewedAt:Date.now()},...history.filter(h=>h.nombre!==recipe.nombre)].slice(0,30);
     setHistory(nh);
-    try{await window.storage.set("chefify-history",JSON.stringify(nh));}catch{}
+    try{await localStorage.set("chefify-history",JSON.stringify(nh));}catch{}
   };
   const isFavorite=r=>favorites.some(f=>f.nombre===r.nombre);
   return{favorites,history,saveFavorite,addToHistory,isFavorite};
@@ -716,17 +716,17 @@ function ModoLista({profile,pendingItems,onClearPending,C}) {
   const genCode=()=>Math.random().toString(36).substring(2,7).toUpperCase();
   const createList=async()=>{
     const code=genCode();
-    try{await window.storage.set(`chefify-list-${code}`,JSON.stringify({code,items:[],createdBy:author,createdAt:Date.now()}),true);}catch{}
+    try{await localStorage.set(`chefify-list-${code}`,JSON.stringify({code,items:[],createdBy:author,createdAt:Date.now()}),true);}catch{}
     setListCode(code);setItems([]);setMode("list");
   };
   const joinList=async()=>{
     const code=joinCode.toUpperCase().trim();
-    try{const r=await window.storage.get(`chefify-list-${code}`,true);if(r?.value){const d=JSON.parse(r.value);setListCode(code);setItems(d.items||[]);setMode("list");}else alert("No se encontró esa lista.");}
+    try{const r=await localStorage.get(`chefify-list-${code}`,true);if(r?.value){const d=JSON.parse(r.value);setListCode(code);setItems(d.items||[]);setMode("list");}else alert("No se encontró esa lista.");}
     catch{alert("Código no encontrado.");}
   };
   const saveList=async(ni)=>{
     if(!listCode)return;setSaving(true);
-    try{const r=await window.storage.get(`chefify-list-${listCode}`,true);const e=r?.value?JSON.parse(r.value):{};await window.storage.set(`chefify-list-${listCode}`,JSON.stringify({...e,items:ni}),true);}catch{}
+    try{const r=await localStorage.get(`chefify-list-${listCode}`,true);const e=r?.value?JSON.parse(r.value):{};await localStorage.set(`chefify-list-${listCode}`,JSON.stringify({...e,items:ni}),true);}catch{}
     setSaving(false);
   };
   const addDirect=async(text)=>{setItems(prev=>{const ni=[...prev,{id:Date.now()+Math.random(),text,author:author||"Yo",done:false}];saveList(ni);return ni;});};
@@ -757,7 +757,7 @@ function ModoLista({profile,pendingItems,onClearPending,C}) {
       <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"16px"}}>
         <button style={{background:"none",border:"none",color:C.textMuted,cursor:"pointer",fontSize:"1rem"}} onClick={()=>setMode("home")}>←</button>
         <div style={{flex:1}}><div style={{fontSize:"1rem",fontWeight:"bold",color:C.green}}>📝 Lista compartida</div><div style={{fontSize:"0.72rem",color:C.textMuted}}>{pending} pendientes • {done} tachados</div></div>
-        <button style={{background:C.borderLight,border:"none",borderRadius:"8px",color:C.green,cursor:"pointer",fontSize:"0.8rem",padding:"7px 14px",fontFamily:"Georgia,serif"}} onClick={async()=>{try{const r=await window.storage.get(`chefify-list-${listCode}`,true);if(r?.value)setItems(JSON.parse(r.value).items||[]);}catch{}}}>↻ Sync</button>
+        <button style={{background:C.borderLight,border:"none",borderRadius:"8px",color:C.green,cursor:"pointer",fontSize:"0.8rem",padding:"7px 14px",fontFamily:"Georgia,serif"}} onClick={async()=>{try{const r=await localStorage.get(`chefify-list-${listCode}`,true);if(r?.value)setItems(JSON.parse(r.value).items||[]);}catch{}}}>↻ Sync</button>
       </div>
       <div style={{background:C.greenFaint,border:`1px solid ${C.borderLight}`,borderRadius:"10px",padding:"14px",marginBottom:"20px",textAlign:"center"}}>
         <div style={{fontSize:"0.7rem",color:C.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:"6px"}}>Código para invitar</div>
@@ -881,7 +881,7 @@ function ModoProfile({profile,setProfile,darkMode,setDarkMode,C}) {
 
   const save=async()=>{
     setProfile(local);
-    try{await window.storage.set("chefify-profile",JSON.stringify(local));}catch{}
+    try{await localStorage.set("chefify-profile",JSON.stringify(local));}catch{}
     setSaved(true);setTimeout(()=>setSaved(false),2500);
     toast("✅ Perfil guardado");
   };
@@ -957,7 +957,7 @@ export default function App() {
 
   useEffect(()=>{
     (async()=>{
-      try{const r=await window.storage.get("chefify-profile");if(r?.value)setProfile(JSON.parse(r.value));}catch{}
+      try{const r=await localStorage.get("chefify-profile");if(r?.value)setProfile(JSON.parse(r.value));}catch{}
     })();
   },[]);
 
