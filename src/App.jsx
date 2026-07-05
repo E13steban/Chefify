@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { initializeApp } from "firebase/app";
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
+import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from "firebase/firestore";
 
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
@@ -189,7 +189,7 @@ function LoginScreen({C}) {
   const [loading, setLoading] = useState(false);
   const login = async () => {
     setLoading(true);
-    try { await signInWithPopup(auth, googleProvider); }
+    try { await signInWithRedirect(auth, googleProvider); }
     catch(e) { toast("⚠️ Error al iniciar sesión. Intenta de nuevo."); }
     finally { setLoading(false); }
   };
