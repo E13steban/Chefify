@@ -208,7 +208,7 @@ function LoginScreen({C}) {
       else if(e.code==="auth/user-not-found"||e.code==="auth/wrong-password"||e.code==="auth/invalid-credential")setError("Correo o contraseña incorrectos");
       else if(e.code==="auth/weak-password")setError("La contraseña debe tener al menos 6 caracteres");
       else if(e.code==="auth/invalid-email")setError("El correo no es válido");
-      else setError("Error al iniciar sesión. Intenta de nuevo.");
+      else setError(`Error: ${e.code} - ${e.message}`);
     }finally{setLoading(false);}
   };
 
