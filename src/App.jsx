@@ -1095,6 +1095,7 @@ export default function App() {
   const recipeUtils=useRecipeUtils(uid);
 
   useEffect(()=>{
+    getRedirectResult(auth).catch(()=>{});
     const unsub=onAuthStateChanged(auth,async(u)=>{
       setUser(u);
       if(u){
