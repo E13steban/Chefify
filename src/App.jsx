@@ -1,5 +1,23 @@
 import { useState, useEffect, useRef } from "react";
+import { initializeApp } from "firebase/app";
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "firebase/auth";
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from "firebase/firestore";
 
+// ─── FIREBASE ────────────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+};
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const googleProvider = new GoogleAuthProvider();
+
+// ─── TEMA ────────────────────────────────────────────────────────────────────
 const DARK = {
   bg:"#0a1a0a",surface:"#121f12",card:"#182818",border:"#1e3a1e",
   borderLight:"#2d5a2d",green:"#6fcf6f",greenDim:"#4a8a4a",greenFaint:"#1a3a1a",
@@ -58,32 +76,37 @@ function buildProfileContext(profile) {
   return parts.length?`\nPerfil: ${parts.join(". ")}.`:"";
 }
 
-// ─── DAILY LIMIT HOOK ────────────────────────────────────────────────────────
+// ─── FIRESTORE HELPERS ───────────────────────────────────────────────────────
+async function saveToFirestore(uid, key, data) {
+  try { await setDoc(doc(db, "users", uid, "data", key), { value: JSON.stringify(data) }); } catch {}
+}
+async function loadFromFirestore(uid, key) {
+  try {
+    const snap = await getDoc(doc(db, "users", uid, "data", key));
+    if(snap.exists()) return JSON.parse(snap.data().value);
+  } catch {}
+  return null;
+}
+
+// ─── DAILY LIMIT ─────────────────────────────────────────────────────────────
 function useDailyLimit(isPremium) {
   const [count, setCount] = useState(0);
   const today = new Date().toDateString();
-
   useEffect(()=>{
     try {
       const saved = localStorage.getItem("chefify-daily");
       if(saved) {
         const { date, count: c } = JSON.parse(saved);
         if(date === today) setCount(c);
-        else { localStorage.setItem("chefify-daily", JSON.stringify({date:today, count:0})); setCount(0); }
+        else { localStorage.setItem("chefify-daily", JSON.stringify({date:today,count:0})); setCount(0); }
       }
     } catch {}
   },[]);
-
   const increment = () => {
-    const newCount = count + 1;
-    setCount(newCount);
-    try { localStorage.setItem("chefify-daily", JSON.stringify({date:today, count:newCount})); } catch {}
+    const n = count + 1; setCount(n);
+    try { localStorage.setItem("chefify-daily", JSON.stringify({date:today,count:n})); } catch {}
   };
-
-  const canGenerate = isPremium || count < DAILY_LIMIT;
-  const remaining = Math.max(0, DAILY_LIMIT - count);
-
-  return { count, increment, canGenerate, remaining };
+  return { canGenerate: isPremium || count < DAILY_LIMIT, remaining: Math.max(0, DAILY_LIMIT-count), increment };
 }
 
 // ─── TOAST ───────────────────────────────────────────────────────────────────
@@ -123,8 +146,8 @@ function MultiChips({label,options,selected,onChange,C}) {
   </>);
 }
 
-// ─── TEMPORIZADOR ────────────────────────────────────────────────────────────
-function StepTimer({step, C}) {
+// ─── STEP TIMER ──────────────────────────────────────────────────────────────
+function StepTimer({step,C}) {
   const [seconds,setSeconds]=useState(0);
   const [running,setRunning]=useState(false);
   const [done,setDone]=useState(false);
@@ -161,18 +184,45 @@ function StepTimer({step, C}) {
   );
 }
 
-// ─── RECIPE OPTIONS SELECTOR ─────────────────────────────────────────────────
-function RecipeOptions({options, onSelect, onBack, C}) {
-  const [loadingIdx, setLoadingIdx] = useState(null);
+// ─── LOGIN SCREEN ─────────────────────────────────────────────────────────────
+function LoginScreen({C}) {
+  const [loading, setLoading] = useState(false);
+  const login = async () => {
+    setLoading(true);
+    try { await signInWithPopup(auth, googleProvider); }
+    catch(e) { toast("⚠️ Error al iniciar sesión. Intenta de nuevo."); }
+    finally { setLoading(false); }
+  };
+  return(
+    <div style={{minHeight:"100vh",background:C.bg,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"20px",fontFamily:"Georgia,serif"}}>
+      <div style={{fontSize:"4rem",marginBottom:"16px"}}>🍳</div>
+      <h1 style={{fontSize:"2rem",fontWeight:"bold",color:C.green,margin:"0 0 8px"}}>Chefify</h1>
+      <p style={{fontSize:"0.9rem",color:C.textMuted,marginBottom:"40px",textAlign:"center"}}>Recetas para todos los mexicanos 🇲🇽</p>
+      <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"20px",padding:"32px 24px",width:"100%",maxWidth:"340px",textAlign:"center"}}>
+        <div style={{fontSize:"1.1rem",fontWeight:"bold",color:C.text,marginBottom:"8px"}}>Bienvenido</div>
+        <p style={{fontSize:"0.82rem",color:C.textMuted,marginBottom:"24px",lineHeight:"1.5"}}>Inicia sesión para guardar tus recetas, favoritos e historial en todos tus dispositivos</p>
+        <button onClick={login} disabled={loading} style={{width:"100%",background:"#fff",border:"1px solid #ddd",borderRadius:"12px",padding:"14px",display:"flex",alignItems:"center",justifyContent:"center",gap:"12px",cursor:"pointer",fontSize:"0.95rem",fontWeight:"bold",color:"#333",fontFamily:"Georgia,serif"}}>
+          <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+          {loading ? "Iniciando sesión..." : "Continuar con Google"}
+        </button>
+        <p style={{fontSize:"0.72rem",color:C.textDim,marginTop:"16px"}}>Al continuar aceptas nuestros términos de uso</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── RECIPE OPTIONS ───────────────────────────────────────────────────────────
+function RecipeOptions({options,onSelect,onBack,C}) {
+  const [loadingIdx,setLoadingIdx]=useState(null);
   return(
     <div style={{maxWidth:"600px",margin:"0 auto",padding:"20px 16px"}}>
       <div style={{marginBottom:"20px"}}>
         <div style={{fontSize:"1.1rem",fontWeight:"bold",color:C.green,marginBottom:"4px"}}>¿Cuál te late? 🍽</div>
         <div style={{fontSize:"0.8rem",color:C.textMuted}}>Elige la receta que más se te antoje</div>
       </div>
-      {options.map((opt, i)=>(
-        <div key={i} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"14px",padding:"16px 18px",marginBottom:"12px",cursor:"pointer"}}
-          onClick={async()=>{setLoadingIdx(i);await onSelect(opt);setLoadingIdx(null);}}>
+      {options.map((opt,i)=>(
+        <div key={i} style={{background:C.card,border:`1px solid ${loadingIdx===i?C.green:C.border}`,borderRadius:"14px",padding:"16px 18px",marginBottom:"12px",cursor:loadingIdx!==null?"not-allowed":"pointer",opacity:loadingIdx!==null&&loadingIdx!==i?0.5:1}}
+          onClick={async()=>{if(loadingIdx!==null)return;setLoadingIdx(i);await onSelect(opt);setLoadingIdx(null);}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"6px"}}>
             <div style={{fontSize:"1rem",fontWeight:"bold",color:C.text,flex:1}}>{opt.nombre}</div>
             {loadingIdx===i&&<span style={{fontSize:"0.75rem",color:C.green}}>Generando...</span>}
@@ -190,7 +240,7 @@ function RecipeOptions({options, onSelect, onBack, C}) {
 }
 
 // ─── RECIPE CARD ─────────────────────────────────────────────────────────────
-function RecipeCard({recipe, onReset, isPremium, onSaveFavorite, isFavorite, onAddToList, C}) {
+function RecipeCard({recipe,onReset,isPremium,onSaveFavorite,isFavorite,onAddToList,C}) {
   const [copied,setCopied]=useState(false);
   const [addedToList,setAddedToList]=useState(false);
   const [imgUrl,setImgUrl]=useState(null);
@@ -198,10 +248,7 @@ function RecipeCard({recipe, onReset, isPremium, onSaveFavorite, isFavorite, onA
 
   useEffect(()=>{
     if(recipe.nombre){
-      fetchFoodImage(recipe.nombre).then(url=>{
-        setImgUrl(url);
-        setImgLoading(false);
-      });
+      fetchFoodImage(recipe.nombre).then(url=>{setImgUrl(url);setImgLoading(false);});
     }
   },[recipe.nombre]);
 
@@ -221,13 +268,10 @@ function RecipeCard({recipe, onReset, isPremium, onSaveFavorite, isFavorite, onA
 
   return(<>
     <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",overflow:"hidden",marginBottom:"16px"}}>
-      {/* Imagen */}
       <div style={{width:"100%",height:"200px",background:C.greenFaint,overflow:"hidden",position:"relative"}}>
-        {imgLoading&&(
-          <div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"2rem"}}>⏳</div>
-        )}
+        {imgLoading&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"2rem",color:C.textDim}}>⏳</div>}
         {imgUrl?(
-          <img src={imgUrl} alt={recipe.nombre} style={{width:"100%",height:"100%",objectFit:"cover",display:imgLoading?"none":"block"}} onLoad={()=>setImgLoading(false)}/>
+          <img src={imgUrl} alt={recipe.nombre} style={{width:"100%",height:"100%",objectFit:"cover",display:imgLoading?"none":"block"}} onLoad={()=>setImgLoading(false)} onError={()=>{setImgUrl(null);setImgLoading(false);}}/>
         ):(
           !imgLoading&&<div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"3.5rem"}}>🍳</div>
         )}
@@ -293,31 +337,34 @@ function RecipeCard({recipe, onReset, isPremium, onSaveFavorite, isFavorite, onA
   </>);
 }
 
-// ─── RECIPE UTILS HOOK ───────────────────────────────────────────────────────
-function useRecipeUtils() {
+// ─── RECIPE UTILS ─────────────────────────────────────────────────────────────
+function useRecipeUtils(uid) {
   const [favorites,setFavorites]=useState([]);
   const [history,setHistory]=useState([]);
+
   useEffect(()=>{
+    if(!uid)return;
     (async()=>{
-      try{
-        const f=await localStorage.get("chefify-favorites");
-        if(f?.value)setFavorites(JSON.parse(f.value));
-        const h=await localStorage.get("chefify-history");
-        if(h?.value)setHistory(JSON.parse(h.value));
-      }catch{}
+      const f = await loadFromFirestore(uid, "favorites");
+      if(f) setFavorites(f);
+      const h = await loadFromFirestore(uid, "history");
+      if(h) setHistory(h);
     })();
-  },[]);
+  },[uid]);
+
   const saveFavorite=async(recipe)=>{
     const exists=favorites.find(f=>f.nombre===recipe.nombre);
     const nf=exists?favorites.filter(f=>f.nombre!==recipe.nombre):[recipe,...favorites].slice(0,50);
     setFavorites(nf);
-    try{await localStorage.set("chefify-favorites",JSON.stringify(nf));}catch{}
+    if(uid) await saveToFirestore(uid,"favorites",nf);
   };
+
   const addToHistory=async(recipe)=>{
     const nh=[{...recipe,viewedAt:Date.now()},...history.filter(h=>h.nombre!==recipe.nombre)].slice(0,30);
     setHistory(nh);
-    try{await localStorage.set("chefify-history",JSON.stringify(nh));}catch{}
+    if(uid) await saveToFirestore(uid,"history",nh);
   };
+
   const isFavorite=r=>favorites.some(f=>f.nombre===r.nombre);
   return{favorites,history,saveFavorite,addToHistory,isFavorite};
 }
@@ -341,13 +388,13 @@ function ModoRefri({profile,isPremium,recipeUtils,onAddToList,C}) {
   const [scanningPhoto,setScanningPhoto]=useState(false);
   const videoRef=useRef(null);
   const streamRef=useRef(null);
-  const { canGenerate, remaining, increment } = useDailyLimit(isPremium);
+  const {canGenerate,remaining,increment}=useDailyLimit(isPremium);
 
   const addIngredients=(text)=>{
     const parts=text.split(/[,،\n]+/).map(p=>p.trim()).filter(p=>p.length>1);
     setIngredients(prev=>[...prev,...parts.filter(p=>!prev.includes(p))]);
   };
-  const add=()=>{if(input.trim()){addIngredients(input);}setInput("");};
+  const add=()=>{if(input.trim())addIngredients(input);setInput("");};
 
   const startListening=()=>{
     const SR=window.SpeechRecognition||window.webkitSpeechRecognition;
@@ -391,27 +438,25 @@ function ModoRefri({profile,isPremium,recipeUtils,onAddToList,C}) {
       const text=data.content?.map(b=>b.text||"").join("")||"";
       const found=text.split(",").map(s=>s.trim()).filter(s=>s.length>1);
       if(found.length>0){setIngredients(prev=>[...prev,...found.filter(f=>!prev.includes(f))]);toast(`📷 Detecté ${found.length} ingredientes`);setCameraOpen(false);setPhotoPreview(null);}
-      else{toast("⚠️ No detecté ingredientes, intenta de nuevo");}
+      else toast("⚠️ No detecté ingredientes, intenta de nuevo");
     }catch{toast("⚠️ Error al analizar la foto");}
     finally{setScanningPhoto(false);}
   };
 
-  // Paso 1: Generar opciones
   const generateOptions=async()=>{
     if(!ingredients.length)return;
-    if(!canGenerate){toast("⚠️ Alcanzaste tu límite de 3 recetas hoy. ¡Activa Premium para recetas ilimitadas!");return;}
+    if(!canGenerate){toast("⚠️ Alcanzaste tu límite de 3 recetas hoy. ¡Activa Premium!");return;}
     setLoading(true);setOptions(null);setError(null);
     const ctx=buildProfileContext(profile);
     try{
-      const r=await callAI(`Eres chef experto.${ctx} Ingredientes disponibles: ${ingredients.join(", ")}. Tipo: ${meal}. Dificultad: ${diff}. Tiempo: ${time}. Para: ${persons}. Cocina: ${cuisine.replace(/[^\w\s]/g,"").trim()}.
-Dame 3 opciones de recetas diferentes. Responde SOLO JSON sin backticks:
-{"opciones":[{"nombre":"","descripcion":"descripción de 1 línea del platillo","tiempo":"X min","dificultad":""}]}`);
+      const r=await callAI(`Eres chef experto.${ctx} Ingredientes: ${ingredients.join(", ")}. Tipo: ${meal}. Dificultad: ${diff}. Tiempo: ${time}. Para: ${persons}. Cocina: ${cuisine.replace(/[^\w\s]/g,"").trim()}.
+Dame 3 opciones de recetas. Responde SOLO JSON sin backticks:
+{"opciones":[{"nombre":"","descripcion":"1 línea","tiempo":"X min","dificultad":""}]}`);
       setOptions(r.opciones||[]);
     }catch{setError("No se pudieron generar las opciones. Intenta de nuevo.");}
     finally{setLoading(false);}
   };
 
-  // Paso 2: Generar receta completa de la opción elegida
   const selectOption=async(opt)=>{
     setOptions(null);
     setLoading(true);
@@ -419,7 +464,7 @@ Dame 3 opciones de recetas diferentes. Responde SOLO JSON sin backticks:
     const ctx=buildProfileContext(profile);
     const macrosField=isPremium?`"calorias":"X kcal por porción","macros":{"Proteína":"Xg","Carbos":"Xg","Grasa":"Xg"},`:"";
     try{
-      const r=await callAI(`Eres chef experto.${ctx} Genera la receta completa de: "${opt.nombre}". Usa principalmente: ${ingredients.join(", ")}. Para: ${persons}.
+      const r=await callAI(`Eres chef experto.${ctx} Receta completa de: "${opt.nombre}". Usa: ${ingredients.join(", ")}. Para: ${persons}.
 Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${persons}","personas":"${persons}","dificultad":"${opt.dificultad}","cocina":"",${macrosField}"ingredientes":[],"ingredientes_faltantes":[],"pasos":[],"tip":""}`);
       setRecipe(r);
       recipeUtils.addToHistory(r);
@@ -428,14 +473,13 @@ Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${person
     finally{setLoading(false);}
   };
 
-  const reset=()=>{setRecipe(null);setOptions(null);};
-
-  const inp={flex:1,background:C.inputBg,border:`1px solid ${C.border}`,borderRadius:"10px",color:C.text,fontSize:"0.95rem",padding:"11px 14px",outline:"none",fontFamily:"Georgia,serif"};
+  const reset=()=>{setRecipe(null);setOptions(null);setError(null);};
   const main={maxWidth:"600px",margin:"0 auto",padding:"20px 16px"};
-  const label={display:"block",fontSize:"0.72rem",fontWeight:"bold",color:C.green,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"8px",marginTop:"18px"};
+  const inp={flex:1,background:C.inputBg,border:`1px solid ${C.border}`,borderRadius:"10px",color:C.text,fontSize:"0.95rem",padding:"11px 14px",outline:"none",fontFamily:"Georgia,serif"};
 
   if(recipe)return<div style={main}><RecipeCard recipe={recipe} onReset={reset} isPremium={isPremium} onSaveFavorite={recipeUtils.saveFavorite} isFavorite={recipeUtils.isFavorite(recipe)} onAddToList={onAddToList} C={C}/></div>;
   if(options)return<RecipeOptions options={options} onSelect={selectOption} onBack={()=>setOptions(null)} C={C}/>;
+  if(loading)return<div style={{...main,textAlign:"center",paddingTop:"60px"}}><div style={{fontSize:"2.5rem",marginBottom:"12px"}}>👨‍🍳</div><p style={{color:C.textMuted}}>El chef está pensando...</p></div>;
 
   if(cameraOpen)return(
     <div style={main}>
@@ -472,7 +516,7 @@ Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${person
       {!isPremium&&(
         <div style={{background:C.greenFaint,border:`1px solid ${C.borderLight}`,borderRadius:"10px",padding:"10px 14px",marginBottom:"16px",fontSize:"0.78rem",color:C.textMuted,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <span>🍳 Recetas gratis hoy: <strong style={{color:C.green}}>{remaining}/{DAILY_LIMIT}</strong></span>
-          {remaining===0&&<span style={{color:C.accent,fontSize:"0.72rem"}}>¡Activa Premium para más!</span>}
+          {remaining===0&&<span style={{color:C.accent,fontSize:"0.72rem"}}>¡Activa Premium!</span>}
         </div>
       )}
       {profile.restrictions?.length>0&&(
@@ -480,7 +524,7 @@ Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${person
           ✅ Perfil aplicado: {profile.restrictions.join(", ")}{profile.allergies?.length>0&&` • Sin: ${profile.allergies.join(", ")}`}
         </div>
       )}
-      <span style={label}>¿Qué tienes en tu refri o alacena?</span>
+      <span style={{display:"block",fontSize:"0.72rem",fontWeight:"bold",color:C.green,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"8px"}}>¿Qué tienes en tu refri o alacena?</span>
       <div style={{display:"flex",gap:"8px"}}>
         <input style={inp} placeholder="Ej: huevos, jitomate, queso..." value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==="Enter"&&add()}/>
         <button style={{background:listening?"#3a1010":C.borderLight,border:listening?`1px solid ${C.accent}`:"none",borderRadius:"10px",color:listening?C.accent:C.green,cursor:"pointer",fontSize:"1.2rem",padding:"0 11px"}} onClick={startListening}>{listening?"🔴":"🎤"}</button>
@@ -501,10 +545,9 @@ Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${person
       <FilterChips label="Cocina" options={CUISINES} value={cuisine} onChange={setCuisine} C={C}/>
       <FilterChips label="Dificultad" options={DIFFICULTIES} value={diff} onChange={setDiff} C={C}/>
       <FilterChips label="Tiempo disponible" options={TIMES} value={time} onChange={setTime} C={C}/>
-      <button style={{width:"100%",background:!ingredients.length||loading||(!canGenerate&&!isPremium)?C.greenFaint:`linear-gradient(135deg,#3a7a3a,#2d5a2d)`,border:!ingredients.length||loading?`1px solid ${C.border}`:"none",borderRadius:"12px",color:!ingredients.length||loading?C.textDim:C.text,cursor:!ingredients.length||loading?"not-allowed":"pointer",fontSize:"1rem",fontWeight:"bold",padding:"15px",fontFamily:"Georgia,serif",marginTop:"20px",marginBottom:"24px"}} onClick={generateOptions} disabled={!ingredients.length||loading}>
-        {loading?"Buscando opciones...":"🍳 ¡Ver opciones de recetas!"}
+      <button style={{width:"100%",background:!ingredients.length?C.greenFaint:`linear-gradient(135deg,#3a7a3a,#2d5a2d)`,border:!ingredients.length?`1px solid ${C.border}`:"none",borderRadius:"12px",color:!ingredients.length?C.textDim:C.text,cursor:!ingredients.length?"not-allowed":"pointer",fontSize:"1rem",fontWeight:"bold",padding:"15px",fontFamily:"Georgia,serif",marginTop:"20px",marginBottom:"24px"}} onClick={generateOptions} disabled={!ingredients.length}>
+        🍳 ¡Ver opciones de recetas!
       </button>
-      {loading&&<div style={{textAlign:"center",padding:"20px 0",color:C.textMuted}}><div style={{fontSize:"2rem",marginBottom:"10px"}}>👨‍🍳</div><p style={{margin:0}}>El chef está pensando opciones...</p></div>}
       {error&&<div style={{background:C.accentDim,border:`1px solid ${C.accent}30`,borderRadius:"12px",color:C.accent,padding:"14px",textAlign:"center",fontSize:"0.88rem"}}>{error}</div>}
     </div>
   );
@@ -521,19 +564,19 @@ function ModoBuscar({profile,isPremium,recipeUtils,onAddToList,C}) {
   const [options,setOptions]=useState(null);
   const [recipe,setRecipe]=useState(null);
   const [error,setError]=useState(null);
-  const { canGenerate, remaining, increment } = useDailyLimit(isPremium);
+  const {canGenerate,remaining,increment}=useDailyLimit(isPremium);
 
   const searchOptions=async()=>{
     if(!query.trim())return;
-    if(!canGenerate){toast("⚠️ Alcanzaste tu límite de 3 recetas hoy. ¡Activa Premium para recetas ilimitadas!");return;}
+    if(!canGenerate){toast("⚠️ Alcanzaste tu límite de 3 recetas hoy. ¡Activa Premium!");return;}
     setLoading(true);setOptions(null);setError(null);
     const ctx=buildProfileContext(profile);
     try{
-      const r=await callAI(`Eres chef experto.${ctx} El usuario quiere algo relacionado con: "${query}". Dificultad: ${diff}. Tiempo: ${time}. Cocina: ${cuisine.replace(/[^\w\s]/g,"").trim()}.
-Dame 3 opciones de recetas diferentes. Responde SOLO JSON sin backticks:
-{"opciones":[{"nombre":"","descripcion":"descripción de 1 línea","tiempo":"X min","dificultad":""}]}`);
+      const r=await callAI(`Eres chef experto.${ctx} El usuario quiere: "${query}". Dificultad: ${diff}. Tiempo: ${time}. Cocina: ${cuisine.replace(/[^\w\s]/g,"").trim()}.
+Dame 3 opciones de recetas. Responde SOLO JSON sin backticks:
+{"opciones":[{"nombre":"","descripcion":"1 línea","tiempo":"X min","dificultad":""}]}`);
       setOptions(r.opciones||[]);
-    }catch{setError("No se encontraron opciones. Intenta con otro término.");}
+    }catch{setError("No se encontraron opciones.");}
     finally{setLoading(false);}
   };
 
@@ -544,7 +587,7 @@ Dame 3 opciones de recetas diferentes. Responde SOLO JSON sin backticks:
     const ctx=buildProfileContext(profile);
     const macrosField=isPremium?`"calorias":"X kcal por porción","macros":{"Proteína":"Xg","Carbos":"Xg","Grasa":"Xg"},`:"";
     try{
-      const r=await callAI(`Eres chef experto.${ctx} Genera la receta completa de: "${opt.nombre}". Para: ${persons}.
+      const r=await callAI(`Eres chef experto.${ctx} Receta completa de: "${opt.nombre}". Para: ${persons}.
 Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${persons}","personas":"${persons}","dificultad":"${opt.dificultad}","cocina":"",${macrosField}"ingredientes":[],"ingredientes_faltantes":[],"pasos":[],"tip":""}`);
       setRecipe(r);
       recipeUtils.addToHistory(r);
@@ -553,19 +596,20 @@ Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${person
     finally{setLoading(false);}
   };
 
-  const reset=()=>{setRecipe(null);setOptions(null);};
+  const reset=()=>{setRecipe(null);setOptions(null);setError(null);};
   const main={maxWidth:"600px",margin:"0 auto",padding:"20px 16px"};
   const inp={width:"100%",background:C.inputBg,border:`1px solid ${C.border}`,borderRadius:"10px",color:C.text,fontSize:"0.95rem",padding:"11px 14px",outline:"none",fontFamily:"Georgia,serif",boxSizing:"border-box"};
 
   if(recipe)return<div style={main}><RecipeCard recipe={recipe} onReset={reset} isPremium={isPremium} onSaveFavorite={recipeUtils.saveFavorite} isFavorite={recipeUtils.isFavorite(recipe)} onAddToList={onAddToList} C={C}/></div>;
   if(options)return<RecipeOptions options={options} onSelect={selectOption} onBack={()=>setOptions(null)} C={C}/>;
+  if(loading)return<div style={{...main,textAlign:"center",paddingTop:"60px"}}><div style={{fontSize:"2.5rem",marginBottom:"12px"}}>📖</div><p style={{color:C.textMuted}}>Buscando recetas...</p></div>;
 
   return(
     <div style={main}>
       {!isPremium&&(
         <div style={{background:C.greenFaint,border:`1px solid ${C.borderLight}`,borderRadius:"10px",padding:"10px 14px",marginBottom:"16px",fontSize:"0.78rem",color:C.textMuted,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
           <span>🍳 Recetas gratis hoy: <strong style={{color:C.green}}>{remaining}/{DAILY_LIMIT}</strong></span>
-          {remaining===0&&<span style={{color:C.accent,fontSize:"0.72rem"}}>¡Activa Premium para más!</span>}
+          {remaining===0&&<span style={{color:C.accent,fontSize:"0.72rem"}}>¡Activa Premium!</span>}
         </div>
       )}
       <span style={{display:"block",fontSize:"0.72rem",fontWeight:"bold",color:C.green,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"8px"}}>¿Qué quieres cocinar?</span>
@@ -575,10 +619,9 @@ Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${person
       <FilterChips label="Cocina" options={CUISINES} value={cuisine} onChange={setCuisine} C={C}/>
       <FilterChips label="Dificultad" options={DIFFICULTIES} value={diff} onChange={setDiff} C={C}/>
       <FilterChips label="Tiempo disponible" options={TIMES} value={time} onChange={setTime} C={C}/>
-      <button style={{width:"100%",background:!query.trim()||loading?C.greenFaint:`linear-gradient(135deg,#3a7a3a,#2d5a2d)`,border:!query.trim()||loading?`1px solid ${C.border}`:"none",borderRadius:"12px",color:!query.trim()||loading?C.textDim:C.text,cursor:!query.trim()||loading?"not-allowed":"pointer",fontSize:"1rem",fontWeight:"bold",padding:"15px",fontFamily:"Georgia,serif",marginTop:"20px",marginBottom:"24px"}} onClick={searchOptions} disabled={!query.trim()||loading}>
-        {loading?"Buscando opciones...":"🔍 Ver opciones de recetas"}
+      <button style={{width:"100%",background:!query.trim()?C.greenFaint:`linear-gradient(135deg,#3a7a3a,#2d5a2d)`,border:!query.trim()?`1px solid ${C.border}`:"none",borderRadius:"12px",color:!query.trim()?C.textDim:C.text,cursor:!query.trim()?"not-allowed":"pointer",fontSize:"1rem",fontWeight:"bold",padding:"15px",fontFamily:"Georgia,serif",marginTop:"20px",marginBottom:"24px"}} onClick={searchOptions} disabled={!query.trim()}>
+        🔍 Ver opciones de recetas
       </button>
-      {loading&&<div style={{textAlign:"center",padding:"20px 0",color:C.textMuted}}><div style={{fontSize:"2rem",marginBottom:"10px"}}>📖</div><p style={{margin:0}}>Buscando...</p></div>}
       {error&&<div style={{background:C.accentDim,borderRadius:"12px",color:C.accent,padding:"14px",textAlign:"center",fontSize:"0.88rem"}}>{error}</div>}
     </div>
   );
@@ -596,7 +639,7 @@ function ModoTrending({profile,isPremium,recipeUtils,onAddToList,C}) {
     (async()=>{
       const ctx=buildProfileContext(profile);
       try{
-        const r=await callAI(`Eres experto en tendencias gastronómicas.${ctx} Dame 6 recetas trending en redes sociales ahora. Mezcla mexicanas e internacionales.
+        const r=await callAI(`Eres experto en tendencias gastronómicas.${ctx} Dame 6 recetas trending en redes sociales. Mezcla mexicanas e internacionales.
 Responde SOLO JSON sin backticks: {"recetas":[{"nombre":"","emoji":"","descripcion":"","tiempo":"","dificultad":"","cocina":"","razon_trending":""}]}`);
         setTrending(r.recetas||[]);
       }catch{setError("No se pudieron cargar las recetas trending.");}
@@ -700,7 +743,7 @@ function ModoHistorial({history,isPremium,recipeUtils,onAddToList,C}) {
 }
 
 // ─── LISTA DEL SÚPER ─────────────────────────────────────────────────────────
-function ModoLista({profile,pendingItems,onClearPending,C}) {
+function ModoLista({uid,profile,pendingItems,onClearPending,C}) {
   const [items,setItems]=useState([]);
   const [input,setInput]=useState("");
   const [author,setAuthor]=useState(profile.name||"Yo");
@@ -708,31 +751,99 @@ function ModoLista({profile,pendingItems,onClearPending,C}) {
   const [joinCode,setJoinCode]=useState("");
   const [mode,setMode]=useState("home");
   const [saving,setSaving]=useState(false);
+  const [myLists,setMyLists]=useState([]);
 
   useEffect(()=>{
-    if(pendingItems?.length>0&&mode==="list"){pendingItems.forEach(t=>addDirect(t));onClearPending();}
+    if(pendingItems?.length>0&&mode==="list"){
+      pendingItems.forEach(t=>addDirect(t));
+      onClearPending();
+    }
   },[pendingItems,mode]);
 
+  useEffect(()=>{
+    if(!uid)return;
+    (async()=>{
+      const saved=await loadFromFirestore(uid,"myLists");
+      if(saved)setMyLists(saved);
+    })();
+  },[uid]);
+
+  const saveMyLists=async(lists)=>{
+    setMyLists(lists);
+    if(uid)await saveToFirestore(uid,"myLists",lists);
+  };
+
   const genCode=()=>Math.random().toString(36).substring(2,7).toUpperCase();
-  const createList=async()=>{
-    const code=genCode();
-    try{await localStorage.set(`chefify-list-${code}`,JSON.stringify({code,items:[],createdBy:author,createdAt:Date.now()}),true);}catch{}
-    setListCode(code);setItems([]);setMode("list");
-  };
-  const joinList=async()=>{
-    const code=joinCode.toUpperCase().trim();
-    try{const r=await localStorage.get(`chefify-list-${code}`,true);if(r?.value){const d=JSON.parse(r.value);setListCode(code);setItems(d.items||[]);setMode("list");}else alert("No se encontró esa lista.");}
-    catch{alert("Código no encontrado.");}
-  };
-  const saveList=async(ni)=>{
-    if(!listCode)return;setSaving(true);
-    try{const r=await localStorage.get(`chefify-list-${listCode}`,true);const e=r?.value?JSON.parse(r.value):{};await localStorage.set(`chefify-list-${listCode}`,JSON.stringify({...e,items:ni}),true);}catch{}
+
+  const saveListToFirestore=async(code,newItems)=>{
+    setSaving(true);
+    try{
+      await setDoc(doc(db,"lists",code),{items:newItems,updatedAt:Date.now()},{merge:true});
+    }catch{}
     setSaving(false);
   };
-  const addDirect=async(text)=>{setItems(prev=>{const ni=[...prev,{id:Date.now()+Math.random(),text,author:author||"Yo",done:false}];saveList(ni);return ni;});};
+
+  const createList=async()=>{
+    const code=genCode();
+    await setDoc(doc(db,"lists",code),{code,items:[],createdBy:author,createdAt:Date.now()});
+    const newLists=[{code,name:`Lista ${code}`,createdAt:Date.now()},...myLists].slice(0,10);
+    await saveMyLists(newLists);
+    setListCode(code);setItems([]);setMode("list");
+  };
+
+  const joinList=async()=>{
+    const code=joinCode.toUpperCase().trim();
+    try{
+      const snap=await getDoc(doc(db,"lists",code));
+      if(snap.exists()){
+        setListCode(code);setItems(snap.data().items||[]);setMode("list");
+        if(!myLists.find(l=>l.code===code)){
+          const newLists=[{code,name:`Lista ${code}`,joinedAt:Date.now()},...myLists].slice(0,10);
+          await saveMyLists(newLists);
+        }
+      } else alert("No se encontró esa lista.");
+    }catch{alert("Error al unirse a la lista.");}
+  };
+
+  const openList=async(code)=>{
+    try{
+      const snap=await getDoc(doc(db,"lists",code));
+      if(snap.exists()){setListCode(code);setItems(snap.data().items||[]);setMode("list");}
+      else alert("Esta lista ya no existe.");
+    }catch{alert("Error al abrir la lista.");}
+  };
+
+  const removeFromMyLists=async(code)=>{
+    const newLists=myLists.filter(l=>l.code!==code);
+    await saveMyLists(newLists);
+  };
+
+  const syncList=async()=>{
+    try{
+      const snap=await getDoc(doc(db,"lists",listCode));
+      if(snap.exists())setItems(snap.data().items||[]);
+    }catch{}
+  };
+
+  const addDirect=async(text)=>{
+    setItems(prev=>{
+      const ni=[...prev,{id:Date.now()+Math.random(),text,author:author||"Yo",done:false}];
+      saveListToFirestore(listCode,ni);
+      return ni;
+    });
+  };
+
   const addItem=async()=>{if(!input.trim())return;await addDirect(input.trim());setInput("");};
-  const toggleItem=async(id)=>{const ni=items.map(it=>it.id===id?{...it,done:!it.done}:it);setItems(ni);await saveList(ni);};
-  const deleteItem=async(id)=>{const ni=items.filter(it=>it.id!==id);setItems(ni);await saveList(ni);};
+
+  const toggleItem=async(id)=>{
+    const ni=items.map(it=>it.id===id?{...it,done:!it.done}:it);
+    setItems(ni);await saveListToFirestore(listCode,ni);
+  };
+
+  const deleteItem=async(id)=>{
+    const ni=items.filter(it=>it.id!==id);
+    setItems(ni);await saveListToFirestore(listCode,ni);
+  };
 
   const main={maxWidth:"600px",margin:"0 auto",padding:"20px 16px"};
   const inp={flex:1,background:C.inputBg,border:`1px solid ${C.border}`,borderRadius:"10px",color:C.text,fontSize:"0.95rem",padding:"11px 14px",outline:"none",fontFamily:"Georgia,serif"};
@@ -740,7 +851,23 @@ function ModoLista({profile,pendingItems,onClearPending,C}) {
 
   if(mode==="home")return(
     <div style={main}>
-      <div style={{marginBottom:"20px"}}><div style={{fontSize:"1.1rem",fontWeight:"bold",color:C.green,marginBottom:"4px"}}>📝 Lista del Súper</div><div style={{fontSize:"0.8rem",color:C.textMuted,lineHeight:"1.5"}}>Crea una lista compartida. Todos pueden agregar y tachar.</div></div>
+      <div style={{marginBottom:"20px"}}><div style={{fontSize:"1.1rem",fontWeight:"bold",color:C.green,marginBottom:"4px"}}>📝 Lista del Súper</div><div style={{fontSize:"0.8rem",color:C.textMuted,lineHeight:"1.5"}}>Crea listas compartidas. Todos pueden agregar y tachar en tiempo real.</div></div>
+      {myLists.length>0&&(
+        <>
+          <span style={{display:"block",fontSize:"0.72rem",fontWeight:"bold",color:C.green,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"8px"}}>Mis listas</span>
+          {myLists.map((l,i)=>(
+            <div key={i} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"12px",padding:"12px 16px",marginBottom:"8px",display:"flex",alignItems:"center",gap:"10px"}}>
+              <div style={{flex:1,cursor:"pointer"}} onClick={()=>openList(l.code)}>
+                <div style={{fontSize:"0.88rem",fontWeight:"bold",color:C.text}}>📝 {l.name}</div>
+                <div style={{fontSize:"0.7rem",color:C.textDim,marginTop:"2px"}}>Código: {l.code}</div>
+              </div>
+              <button style={{background:"none",border:"none",color:C.green,cursor:"pointer",fontSize:"0.8rem",padding:"6px 12px",borderRadius:"8px",border:`1px solid ${C.borderLight}`}} onClick={()=>openList(l.code)}>Abrir →</button>
+              <button style={{background:"none",border:"none",color:C.textDim,cursor:"pointer",fontSize:"0.9rem",padding:"4px"}} onClick={()=>removeFromMyLists(l.code)}>✕</button>
+            </div>
+          ))}
+          <div style={{display:"flex",alignItems:"center",gap:"10px",margin:"16px 0",color:C.textDim,fontSize:"0.78rem"}}><div style={{flex:1,height:"1px",background:C.border}}/><span>nueva lista</span><div style={{flex:1,height:"1px",background:C.border}}/></div>
+        </>
+      )}
       <span style={{display:"block",fontSize:"0.72rem",fontWeight:"bold",color:C.green,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"8px"}}>Tu nombre en la lista</span>
       <input style={{...inp,flex:"unset",width:"100%",boxSizing:"border-box"}} placeholder="Ej: Mamá, Juan..." value={author} onChange={e=>setAuthor(e.target.value)}/>
       <button style={btn} onClick={createList}>📝 Crear nueva lista</button>
@@ -757,7 +884,7 @@ function ModoLista({profile,pendingItems,onClearPending,C}) {
       <div style={{display:"flex",alignItems:"center",gap:"10px",marginBottom:"16px"}}>
         <button style={{background:"none",border:"none",color:C.textMuted,cursor:"pointer",fontSize:"1rem"}} onClick={()=>setMode("home")}>←</button>
         <div style={{flex:1}}><div style={{fontSize:"1rem",fontWeight:"bold",color:C.green}}>📝 Lista compartida</div><div style={{fontSize:"0.72rem",color:C.textMuted}}>{pending} pendientes • {done} tachados</div></div>
-        <button style={{background:C.borderLight,border:"none",borderRadius:"8px",color:C.green,cursor:"pointer",fontSize:"0.8rem",padding:"7px 14px",fontFamily:"Georgia,serif"}} onClick={async()=>{try{const r=await localStorage.get(`chefify-list-${listCode}`,true);if(r?.value)setItems(JSON.parse(r.value).items||[]);}catch{}}}>↻ Sync</button>
+        <button style={{background:C.borderLight,border:"none",borderRadius:"8px",color:C.green,cursor:"pointer",fontSize:"0.8rem",padding:"7px 14px",fontFamily:"Georgia,serif"}} onClick={syncList}>↻ Sync</button>
       </div>
       <div style={{background:C.greenFaint,border:`1px solid ${C.borderLight}`,borderRadius:"10px",padding:"14px",marginBottom:"20px",textAlign:"center"}}>
         <div style={{fontSize:"0.7rem",color:C.textMuted,letterSpacing:"0.08em",textTransform:"uppercase",marginBottom:"6px"}}>Código para invitar</div>
@@ -786,7 +913,7 @@ function ModoLista({profile,pendingItems,onClearPending,C}) {
         ))}
         {items.length===0&&<div style={{textAlign:"center",color:C.textDim,fontSize:"0.85rem",padding:"30px 0"}}>La lista está vacía 🛒</div>}
       </div>
-      {done>0&&<button style={{width:"100%",background:"transparent",border:`1px solid ${C.border}`,borderRadius:"12px",color:C.textDim,cursor:"pointer",fontSize:"0.88rem",padding:"11px",fontFamily:"Georgia,serif",marginTop:"12px"}} onClick={()=>{const ni=items.filter(it=>!it.done);setItems(ni);saveList(ni);}}>🗑 Borrar tachados</button>}
+      {done>0&&<button style={{width:"100%",background:"transparent",border:`1px solid ${C.border}`,borderRadius:"12px",color:C.textDim,cursor:"pointer",fontSize:"0.88rem",padding:"11px",fontFamily:"Georgia,serif",marginTop:"12px"}} onClick={()=>{const ni=items.filter(it=>!it.done);setItems(ni);saveListToFirestore(listCode,ni);}}>🗑 Borrar tachados</button>}
     </div>
   );
 }
@@ -874,22 +1001,31 @@ Responde SOLO JSON sin backticks: {"dias":[{"dia":"Lunes","calorias_total":"X kc
 }
 
 // ─── PERFIL ──────────────────────────────────────────────────────────────────
-function ModoProfile({profile,setProfile,darkMode,setDarkMode,C}) {
+function ModoProfile({user,profile,setProfile,darkMode,setDarkMode,uid,C}) {
   const [local,setLocal]=useState(profile);
   const [saved,setSaved]=useState(false);
   const [dislikeInput,setDislikeInput]=useState("");
 
+  useEffect(()=>{ setLocal(profile); },[profile]);
+
   const save=async()=>{
     setProfile(local);
-    try{await localStorage.set("chefify-profile",JSON.stringify(local));}catch{}
+    if(uid) await saveToFirestore(uid,"profile",local);
     setSaved(true);setTimeout(()=>setSaved(false),2500);
     toast("✅ Perfil guardado");
   };
+
   const addDislike=()=>{
     const v=dislikeInput.trim();
     if(v&&!local.dislikes?.includes(v))setLocal({...local,dislikes:[...(local.dislikes||[]),v]});
     setDislikeInput("");
   };
+
+  const handleSignOut=async()=>{
+    await signOut(auth);
+    toast("👋 Sesión cerrada");
+  };
+
   const requestNotifications=async()=>{
     if(!("Notification" in window)){toast("⚠️ Tu navegador no soporta notificaciones");return;}
     const perm=await Notification.requestPermission();
@@ -904,11 +1040,11 @@ function ModoProfile({profile,setProfile,darkMode,setDarkMode,C}) {
   return(
     <div style={main}>
       <div style={{background:`linear-gradient(135deg,${C.greenFaint},${C.card})`,border:`1px solid ${C.border}`,borderRadius:"16px",padding:"20px",marginBottom:"20px",textAlign:"center"}}>
-        <div style={{fontSize:"2.5rem",marginBottom:"8px"}}>👤</div>
-        <div style={{fontSize:"1.2rem",fontWeight:"bold",color:C.green}}>{local.name||"Mi perfil"}</div>
-        <div style={{fontSize:"0.78rem",color:C.textMuted,marginTop:"4px"}}>Tus preferencias se aplican a todas las recetas</div>
+        {user?.photoURL&&<img src={user.photoURL} alt="foto" style={{width:"60px",height:"60px",borderRadius:"50%",marginBottom:"8px",border:`2px solid ${C.borderLight}`}}/>}
+        <div style={{fontSize:"1.1rem",fontWeight:"bold",color:C.green}}>{user?.displayName||local.name||"Mi perfil"}</div>
+        <div style={{fontSize:"0.78rem",color:C.textMuted,marginTop:"4px"}}>{user?.email}</div>
       </div>
-      <span style={{display:"block",fontSize:"0.72rem",fontWeight:"bold",color:C.green,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"8px"}}>Tu nombre</span>
+      <span style={{display:"block",fontSize:"0.72rem",fontWeight:"bold",color:C.green,letterSpacing:"0.1em",textTransform:"uppercase",marginBottom:"8px"}}>Tu nombre en la app</span>
       <input style={inp} placeholder="¿Cómo te llamamos?" value={local.name||""} onChange={e=>setLocal({...local,name:e.target.value})}/>
       <MultiChips label="Restricciones alimenticias" options={RESTRICTIONS} selected={local.restrictions||[]} onChange={v=>setLocal({...local,restrictions:v})} C={C}/>
       <MultiChips label="Alergias" options={ALLERGIES} selected={local.allergies||[]} onChange={v=>setLocal({...local,allergies:v})} C={C}/>
@@ -938,6 +1074,7 @@ function ModoProfile({profile,setProfile,darkMode,setDarkMode,C}) {
       </div>
       <button style={{background:`linear-gradient(135deg,#3a7a3a,#2d5a2d)`,border:"none",borderRadius:"10px",color:"#e0ede0",cursor:"pointer",fontSize:"0.88rem",fontWeight:"bold",padding:"13px",fontFamily:"Georgia,serif",marginTop:"20px",width:"100%"}} onClick={save}>💾 Guardar perfil</button>
       {saved&&<div style={{textAlign:"center",color:C.green,fontSize:"0.82rem",marginTop:"10px"}}>✅ ¡Perfil guardado!</div>}
+      <button style={{background:"transparent",border:`1px solid ${C.accent}30`,borderRadius:"10px",color:C.accent,cursor:"pointer",fontSize:"0.85rem",padding:"12px",fontFamily:"Georgia,serif",marginTop:"12px",width:"100%"}} onClick={handleSignOut}>Cerrar sesión</button>
     </div>
   );
 }
@@ -946,6 +1083,7 @@ function ModoProfile({profile,setProfile,darkMode,setDarkMode,C}) {
 const DEFAULT_PROFILE={name:"",restrictions:[],allergies:[],dislikes:[],goal:"Sin objetivo"};
 
 export default function App() {
+  const [user,setUser]=useState(undefined); // undefined = cargando, null = no autenticado
   const [tab,setTab]=useState(0);
   const [overlay,setOverlay]=useState(null);
   const [profile,setProfile]=useState(DEFAULT_PROFILE);
@@ -953,13 +1091,31 @@ export default function App() {
   const [pendingListItems,setPendingListItems]=useState([]);
   const [darkMode,setDarkMode]=useState(true);
   const C=darkMode?DARK:LIGHT;
-  const recipeUtils=useRecipeUtils();
+  const uid=user?.uid||null;
+  const recipeUtils=useRecipeUtils(uid);
 
   useEffect(()=>{
-    (async()=>{
-      try{const r=await localStorage.get("chefify-profile");if(r?.value)setProfile(JSON.parse(r.value));}catch{}
-    })();
+    const unsub=onAuthStateChanged(auth,async(u)=>{
+      setUser(u);
+      if(u){
+        const p=await loadFromFirestore(u.uid,"profile");
+        if(p) setProfile(p);
+        else if(u.displayName) setProfile(prev=>({...prev,name:u.displayName}));
+      }
+    });
+    return unsub;
   },[]);
+
+  // Pantalla de carga
+  if(user===undefined)return(
+    <div style={{minHeight:"100vh",background:DARK.bg,display:"flex",alignItems:"center",justifyContent:"center",flexDirection:"column",gap:"16px"}}>
+      <div style={{fontSize:"3rem"}}>🍳</div>
+      <div style={{color:DARK.green,fontSize:"1.2rem",fontWeight:"bold"}}>Chefify</div>
+    </div>
+  );
+
+  // Pantalla de login
+  if(!user)return<LoginScreen C={C}/>;
 
   const handleAddToList=(ingredients)=>{
     setPendingListItems(ingredients||[]);setOverlay("lista");
@@ -992,6 +1148,7 @@ export default function App() {
             <p style={{fontSize:"0.68rem",color:C.textMuted,margin:0}}>Recetas para todos los mexicanos 🇲🇽</p>
           </div>
           <div style={{display:"flex",gap:"6px",marginLeft:"auto",alignItems:"center"}}>
+            {user?.photoURL&&<img src={user.photoURL} alt="" style={{width:"28px",height:"28px",borderRadius:"50%",border:`1px solid ${C.borderLight}`}}/>}
             <button style={overlay==="lista"?iconBtnA:iconBtn} onClick={()=>openOverlay("lista")} title="Lista del súper">📝</button>
             <button style={isPremium?iconBtnG:(overlay==="premium"?iconBtnA:iconBtn)} onClick={()=>openOverlay("premium")} title="Premium">👑</button>
             <button style={overlay==="perfil"?iconBtnA:iconBtn} onClick={()=>openOverlay("perfil")} title="Perfil y ajustes">⚙️</button>
@@ -999,9 +1156,9 @@ export default function App() {
         </div>
       </div>
 
-      {overlay==="lista"&&<ModoLista profile={profile} pendingItems={pendingListItems} onClearPending={()=>setPendingListItems([])} C={C}/>}
+      {overlay==="lista"&&<ModoLista uid={uid} profile={profile} pendingItems={pendingListItems} onClearPending={()=>setPendingListItems([])} C={C}/>}
       {overlay==="premium"&&<ModoPremium isPremium={isPremium} setIsPremium={setIsPremium} profile={profile} C={C}/>}
-      {overlay==="perfil"&&<ModoProfile profile={profile} setProfile={setProfile} darkMode={darkMode} setDarkMode={setDarkMode} C={C}/>}
+      {overlay==="perfil"&&<ModoProfile user={user} profile={profile} setProfile={setProfile} darkMode={darkMode} setDarkMode={setDarkMode} uid={uid} C={C}/>}
 
       {!overlay&&(
         <>
