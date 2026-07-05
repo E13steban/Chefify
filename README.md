@@ -1,2 +1,2 @@
 # Chefify
-app de recetas para mexicanos 
+app de recetas faciles para mexicanos 
