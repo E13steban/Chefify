@@ -1,0 +1,11 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a3a1a"/>
+      <stop offset="100%" stop-color="#122a12"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+  <rect x="8" y="8" width="496" height="496" rx="106" fill="none" stroke="#4a9a4a" stroke-width="6"/>
+  <text x="256" y="256" font-family="Georgia, serif" font-size="110" font-weight="bold" fill="#e0ede0" text-anchor="middle" dominant-baseline="middle" letter-spacing="-3">Chefify</text>
+</svg>
