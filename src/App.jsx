@@ -512,28 +512,33 @@ Dame 3 opciones de recetas. Responde SOLO JSON sin backticks:
   };
 
   const selectOption=(opt)=>{
+    // Primero actualizamos screen a loading SIN limpiar options
+    // para que React nunca tenga un frame vacío
     setScreen("loading");
-    setError(null);
+    const selectedOpt = opt;
     const ctx=buildProfileContext(profile);
     const macrosField=isPremium?`"calorias":"X kcal por porción","macros":{"Proteína":"Xg","Carbos":"Xg","Grasa":"Xg"},`:"";
-    callAI(`Eres chef experto.${ctx} Receta completa de: "${opt.nombre}". Usa principalmente: ${ingredients.join(", ")}. Para: ${persons}.
-Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${persons}","personas":"${persons}","dificultad":"${opt.dificultad}","cocina":"",${macrosField}"ingredientes":[],"ingredientes_faltantes":[],"pasos":[],"tip":""}`)
-    .then(r=>{
-      if(r&&r.nombre){
-        setRecipe(r);
-        setScreen("recipe");
-        recipeUtils.addToHistory(r);
-        increment();
-      } else {
+    setTimeout(()=>{
+      callAI(`Eres chef experto.${ctx} Receta completa de: "${selectedOpt.nombre}". Usa principalmente: ${ingredients.join(", ")}. Para: ${persons}.
+Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${persons}","personas":"${persons}","dificultad":"${selectedOpt.dificultad}","cocina":"",${macrosField}"ingredientes":[],"ingredientes_faltantes":[],"pasos":[],"tip":""}`)
+      .then(r=>{
+        if(r&&r.nombre){
+          setOptions(null);
+          setRecipe(r);
+          setScreen("recipe");
+          recipeUtils.addToHistory(r);
+          increment();
+        } else {
+          setError("No se pudo generar la receta. Intenta de nuevo.");
+          setScreen("options");
+        }
+      })
+      .catch(e=>{
+        console.error(e);
         setError("No se pudo generar la receta. Intenta de nuevo.");
         setScreen("options");
-      }
-    })
-    .catch(e=>{
-      console.error(e);
-      setError("No se pudo generar la receta. Intenta de nuevo.");
-      setScreen("options");
-    });
+      });
+    }, 50);
   };
 
   const reset=()=>{setRecipe(null);setOptions(null);setError(null);setScreen("form");};
@@ -541,8 +546,8 @@ Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${person
   const inp={flex:1,background:C.inputBg,border:`1px solid ${C.border}`,borderRadius:"10px",color:C.text,fontSize:"0.95rem",padding:"11px 14px",outline:"none",fontFamily:"Georgia,serif"};
 
   if(screen==="recipe"&&recipe)return<div style={main}><RecipeCard recipe={recipe} onReset={reset} isPremium={isPremium} onSaveFavorite={recipeUtils.saveFavorite} isFavorite={recipeUtils.isFavorite(recipe)} onAddToList={onAddToList} C={C}/></div>;
-  if(screen==="loading")return<div style={{...main,textAlign:"center",paddingTop:"60px"}}><div style={{fontSize:"2.5rem",marginBottom:"12px"}}>👨‍🍳</div><p style={{color:C.textMuted}}>El chef está pensando...</p></div>;
-  if(screen==="options"&&options)return<RecipeOptions options={options} onSelect={selectOption} onBack={()=>setScreen("form")} C={C}/>;
+  if(screen==="loading"||screen==="options"&&!options)return<div style={{...main,textAlign:"center",paddingTop:"60px"}}><div style={{fontSize:"2.5rem",marginBottom:"12px"}}>👨‍🍳</div><p style={{color:C.textMuted}}>El chef está pensando...</p></div>;
+  if((screen==="options"||screen==="loading")&&options)return<RecipeOptions options={options} onSelect={selectOption} onBack={()=>setScreen("form")} C={C}/>;
 
   if(cameraOpen)return(
     <div style={main}>
@@ -646,27 +651,30 @@ Dame 3 opciones de recetas. Responde SOLO JSON sin backticks:
 
   const selectOption=(opt)=>{
     setScreen("loading");
-    setError(null);
+    const selectedOpt = opt;
     const ctx=buildProfileContext(profile);
     const macrosField=isPremium?`"calorias":"X kcal por porción","macros":{"Proteína":"Xg","Carbos":"Xg","Grasa":"Xg"},`:"";
-    callAI(`Eres chef experto.${ctx} Receta completa de: "${opt.nombre}". Para: ${persons}.
-Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${persons}","personas":"${persons}","dificultad":"${opt.dificultad}","cocina":"",${macrosField}"ingredientes":[],"ingredientes_faltantes":[],"pasos":[],"tip":""}`)
-    .then(r=>{
-      if(r&&r.nombre){
-        setRecipe(r);
-        setScreen("recipe");
-        recipeUtils.addToHistory(r);
-        increment();
-      } else {
+    setTimeout(()=>{
+      callAI(`Eres chef experto.${ctx} Receta completa de: "${selectedOpt.nombre}". Para: ${persons}.
+Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${persons}","personas":"${persons}","dificultad":"${selectedOpt.dificultad}","cocina":"",${macrosField}"ingredientes":[],"ingredientes_faltantes":[],"pasos":[],"tip":""}`)
+      .then(r=>{
+        if(r&&r.nombre){
+          setOptions(null);
+          setRecipe(r);
+          setScreen("recipe");
+          recipeUtils.addToHistory(r);
+          increment();
+        } else {
+          setError("No se pudo generar la receta. Intenta de nuevo.");
+          setScreen("options");
+        }
+      })
+      .catch(e=>{
+        console.error(e);
         setError("No se pudo generar la receta. Intenta de nuevo.");
         setScreen("options");
-      }
-    })
-    .catch(e=>{
-      console.error(e);
-      setError("No se pudo generar la receta. Intenta de nuevo.");
-      setScreen("options");
-    });
+      });
+    }, 50);
   };
 
   const reset=()=>{setRecipe(null);setOptions(null);setError(null);setScreen("form");};
@@ -674,8 +682,8 @@ Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${person
   const inp={width:"100%",background:C.inputBg,border:`1px solid ${C.border}`,borderRadius:"10px",color:C.text,fontSize:"0.95rem",padding:"11px 14px",outline:"none",fontFamily:"Georgia,serif",boxSizing:"border-box"};
 
   if(screen==="recipe"&&recipe)return<div style={main}><RecipeCard recipe={recipe} onReset={reset} isPremium={isPremium} onSaveFavorite={recipeUtils.saveFavorite} isFavorite={recipeUtils.isFavorite(recipe)} onAddToList={onAddToList} C={C}/></div>;
-  if(screen==="loading")return<div style={{...main,textAlign:"center",paddingTop:"60px"}}><div style={{fontSize:"2.5rem",marginBottom:"12px"}}>📖</div><p style={{color:C.textMuted}}>Buscando recetas...</p></div>;
-  if(screen==="options"&&options)return<RecipeOptions options={options} onSelect={selectOption} onBack={()=>setScreen("form")} C={C}/>;
+  if(screen==="loading"||screen==="options"&&!options)return<div style={{...main,textAlign:"center",paddingTop:"60px"}}><div style={{fontSize:"2.5rem",marginBottom:"12px"}}>📖</div><p style={{color:C.textMuted}}>Buscando recetas...</p></div>;
+  if((screen==="options"||screen==="loading")&&options)return<RecipeOptions options={options} onSelect={selectOption} onBack={()=>setScreen("form")} C={C}/>;
 
   return(
     <div style={main}>
