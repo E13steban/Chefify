@@ -269,7 +269,6 @@ function LoginScreen({C}) {
 
 // ─── RECIPE OPTIONS ───────────────────────────────────────────────────────────
 function RecipeOptions({options,onSelect,onBack,C}) {
-  const [loadingIdx,setLoadingIdx]=useState(null);
   return(
     <div style={{maxWidth:"600px",margin:"0 auto",padding:"20px 16px"}}>
       <div style={{marginBottom:"20px"}}>
@@ -277,12 +276,9 @@ function RecipeOptions({options,onSelect,onBack,C}) {
         <div style={{fontSize:"0.8rem",color:C.textMuted}}>Elige la receta que más se te antoje</div>
       </div>
       {options.map((opt,i)=>(
-        <div key={i} style={{background:C.card,border:`1px solid ${loadingIdx===i?C.green:C.border}`,borderRadius:"14px",padding:"16px 18px",marginBottom:"12px",cursor:loadingIdx!==null?"not-allowed":"pointer",opacity:loadingIdx!==null&&loadingIdx!==i?0.5:1}}
-          onClick={async()=>{if(loadingIdx!==null)return;setLoadingIdx(i);await onSelect(opt);setLoadingIdx(null);}}>
-          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"6px"}}>
-            <div style={{fontSize:"1rem",fontWeight:"bold",color:C.text,flex:1}}>{opt.nombre}</div>
-            {loadingIdx===i&&<span style={{fontSize:"0.75rem",color:C.green}}>Generando...</span>}
-          </div>
+        <div key={i} style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"14px",padding:"16px 18px",marginBottom:"12px",cursor:"pointer"}}
+          onClick={()=>onSelect(opt)}>
+          <div style={{fontSize:"1rem",fontWeight:"bold",color:C.text,marginBottom:"6px"}}>{opt.nombre}</div>
           <div style={{fontSize:"0.82rem",color:C.textMuted,marginBottom:"10px",lineHeight:"1.4"}}>{opt.descripcion}</div>
           <div style={{display:"flex",gap:"8px",flexWrap:"wrap"}}>
             <span style={{fontSize:"0.72rem",color:C.textDim,background:C.bg,borderRadius:"5px",padding:"2px 8px"}}>⏱ {opt.tiempo}</span>
@@ -542,8 +538,8 @@ Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${person
   const inp={flex:1,background:C.inputBg,border:`1px solid ${C.border}`,borderRadius:"10px",color:C.text,fontSize:"0.95rem",padding:"11px 14px",outline:"none",fontFamily:"Georgia,serif"};
 
   if(recipe)return<div style={main}><RecipeCard recipe={recipe} onReset={reset} isPremium={isPremium} onSaveFavorite={recipeUtils.saveFavorite} isFavorite={recipeUtils.isFavorite(recipe)} onAddToList={onAddToList} C={C}/></div>;
-  if(options)return<RecipeOptions options={options} onSelect={selectOption} onBack={()=>setOptions(null)} C={C}/>;
   if(loading)return<div style={{...main,textAlign:"center",paddingTop:"60px"}}><div style={{fontSize:"2.5rem",marginBottom:"12px"}}>👨‍🍳</div><p style={{color:C.textMuted}}>El chef está pensando...</p></div>;
+  if(options)return<RecipeOptions options={options} onSelect={selectOption} onBack={()=>setOptions(null)} C={C}/>;
 
   if(cameraOpen)return(
     <div style={main}>
@@ -673,8 +669,8 @@ Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${person
   const inp={width:"100%",background:C.inputBg,border:`1px solid ${C.border}`,borderRadius:"10px",color:C.text,fontSize:"0.95rem",padding:"11px 14px",outline:"none",fontFamily:"Georgia,serif",boxSizing:"border-box"};
 
   if(recipe)return<div style={main}><RecipeCard recipe={recipe} onReset={reset} isPremium={isPremium} onSaveFavorite={recipeUtils.saveFavorite} isFavorite={recipeUtils.isFavorite(recipe)} onAddToList={onAddToList} C={C}/></div>;
-  if(options)return<RecipeOptions options={options} onSelect={selectOption} onBack={()=>setOptions(null)} C={C}/>;
   if(loading)return<div style={{...main,textAlign:"center",paddingTop:"60px"}}><div style={{fontSize:"2.5rem",marginBottom:"12px"}}>📖</div><p style={{color:C.textMuted}}>Buscando recetas...</p></div>;
+  if(options)return<RecipeOptions options={options} onSelect={selectOption} onBack={()=>setOptions(null)} C={C}/>;
 
   return(
     <div style={main}>
