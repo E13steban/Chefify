@@ -934,7 +934,7 @@ function ModoLista({uid,profile,pendingItems,onClearPending,C}) {
                 <div style={{fontSize:"0.88rem",fontWeight:"bold",color:C.text}}>📝 {l.name}</div>
                 <div style={{fontSize:"0.7rem",color:C.textDim,marginTop:"2px"}}>Código: {l.code}</div>
               </div>
-              <button style={{background:"none",border:"none",color:C.green,cursor:"pointer",fontSize:"0.8rem",padding:"6px 12px",borderRadius:"8px",border:`1px solid ${C.borderLight}`}} onClick={()=>openList(l.code)}>Abrir →</button>
+              <button style={{background:"none",border:`1px solid ${C.borderLight}`,color:C.green,cursor:"pointer",fontSize:"0.8rem",padding:"6px 12px",borderRadius:"8px"}} onClick={()=>openList(l.code)}>Abrir →</button>
               <button style={{background:"none",border:"none",color:C.textDim,cursor:"pointer",fontSize:"0.9rem",padding:"4px"}} onClick={()=>removeFromMyLists(l.code)}>✕</button>
             </div>
           ))}
