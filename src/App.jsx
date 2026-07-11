@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { initializeApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "firebase/auth";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail } from "firebase/auth";
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from "firebase/firestore";
 
 // ─── FIREBASE ────────────────────────────────────────────────────────────────
@@ -59,11 +59,17 @@ async function callAI(prompt, imageBase64=null) {
 
 async function fetchFoodImage(query) {
   try {
-    const q = encodeURIComponent(query + " food dish plated");
-    const res = await fetch(`https://api.unsplash.com/search/photos?query=${q}&per_page=1&orientation=landscape&client_id=${import.meta.env.VITE_UNSPLASH_KEY}`);
+    const q = encodeURIComponent(query + " comida platillo");
+    const res = await fetch(`https://api.unsplash.com/search/photos?query=${q}&per_page=3&orientation=landscape&client_id=${import.meta.env.VITE_UNSPLASH_KEY}`);
+    if(!res.ok) return null;
     const data = await res.json();
-    return data.results?.[0]?.urls?.regular || null;
-  } catch { return null; }
+    if(data.results?.length>0) return data.results[0].urls?.regular || null;
+    // Fallback: búsqueda genérica de comida
+    const res2 = await fetch(`https://api.unsplash.com/search/photos?query=mexican+food+dish&per_page=1&orientation=landscape&client_id=${import.meta.env.VITE_UNSPLASH_KEY}`);
+    if(!res2.ok) return null;
+    const data2 = await res2.json();
+    return data2.results?.[0]?.urls?.regular || null;
+  } catch(e) { console.error("Unsplash error:", e); return null; }
 }
 
 function buildProfileContext(profile) {
@@ -164,21 +170,27 @@ function StepTimer({step,C}) {
     return()=>clearInterval(ref.current);
   },[running,left]);
   const fmt=s=>`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+  const reset=()=>{clearInterval(ref.current);setSeconds(0);setRunning(false);setDone(false);};
   return(
-    <div style={{background:C.greenFaint,border:`1px solid ${C.border}`,borderRadius:"8px",padding:"8px 12px",marginTop:"6px",display:"flex",alignItems:"center",gap:"10px"}}>
-      <div style={{flex:1}}>
-        <div style={{fontSize:"0.7rem",color:C.textDim,marginBottom:"4px"}}>⏱ {fmt(left>0?left:0)}</div>
-        <div style={{background:C.border,borderRadius:"4px",height:"4px",overflow:"hidden"}}>
-          <div style={{background:done?C.accent:C.green,height:"100%",width:`${pct}%`,transition:"width 1s linear"}}/>
+    <div style={{background:C.greenFaint,border:`1px solid ${C.borderLight}`,borderRadius:"12px",padding:"14px 16px",marginTop:"10px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:"12px",marginBottom:"10px"}}>
+        <span style={{fontSize:"1.2rem"}}>⏱</span>
+        <div style={{fontSize:"1.6rem",fontWeight:"bold",color:done?C.accent:C.green,fontFamily:"Georgia,serif",letterSpacing:"2px"}}>
+          {fmt(left>0?left:0)}
         </div>
+        {done&&<span style={{fontSize:"0.85rem",color:C.accent,fontWeight:"bold"}}>✅ ¡Listo!</span>}
       </div>
-      {!done?(
-        <button onClick={()=>setRunning(r=>!r)} style={{background:running?C.accentDim:C.borderLight,border:"none",borderRadius:"6px",color:running?C.accent:C.green,cursor:"pointer",fontSize:"0.75rem",padding:"4px 10px",fontFamily:"Georgia,serif"}}>
-          {running?"⏸ Pausa":"▶ Iniciar"}
+      <div style={{background:C.border,borderRadius:"6px",height:"8px",overflow:"hidden",marginBottom:"12px"}}>
+        <div style={{background:done?C.accent:C.green,height:"100%",width:`${pct}%`,transition:"width 1s linear",borderRadius:"6px"}}/>
+      </div>
+      <div style={{display:"flex",gap:"8px"}}>
+        <button onClick={()=>setRunning(r=>!r)} disabled={done} style={{flex:2,background:running?C.accentDim:C.borderLight,border:`1px solid ${running?C.accent:C.borderLight}`,borderRadius:"8px",color:running?C.accent:C.green,cursor:done?"not-allowed":"pointer",fontSize:"0.9rem",fontWeight:"bold",padding:"8px 12px",fontFamily:"Georgia,serif"}}>
+          {running?"⏸ Pausar":"▶ Iniciar"}
         </button>
-      ):(
-        <span style={{fontSize:"0.75rem",color:C.accent}}>✅ Listo</span>
-      )}
+        <button onClick={reset} style={{flex:1,background:"transparent",border:`1px solid ${C.border}`,borderRadius:"8px",color:C.textDim,cursor:"pointer",fontSize:"0.9rem",padding:"8px 12px",fontFamily:"Georgia,serif"}}>
+          🔄 Reiniciar
+        </button>
+      </div>
     </div>
   );
 }
@@ -238,6 +250,18 @@ function LoginScreen({C}) {
         <button onClick={()=>{setIsRegister(!isRegister);setError("");}} style={{width:"100%",background:"transparent",border:"none",color:C.green,cursor:"pointer",fontSize:"0.82rem",marginTop:"14px",fontFamily:"Georgia,serif"}}>
           {isRegister?"¿Ya tienes cuenta? Inicia sesión":"¿No tienes cuenta? Regístrate"}
         </button>
+        {!isRegister&&(
+          <button onClick={async()=>{
+            if(!email){setError("Escribe tu correo primero");return;}
+            try{
+              await sendPasswordResetEmail(auth,email);
+              setError("");
+              alert(`📧 Te enviamos un correo a ${email} para resetear tu contraseña`);
+            }catch(e){setError("No se pudo enviar el correo. Verifica tu email.");}
+          }} style={{width:"100%",background:"transparent",border:"none",color:C.textDim,cursor:"pointer",fontSize:"0.75rem",marginTop:"8px",fontFamily:"Georgia,serif"}}>
+            ¿Olvidaste tu contraseña?
+          </button>
+        )}
       </div>
     </div>
   );
@@ -491,17 +515,25 @@ Dame 3 opciones de recetas. Responde SOLO JSON sin backticks:
 
   const selectOption=async(opt)=>{
     setOptions(null);
-    setLoading(true);
+    setRecipe(null);
     setError(null);
+    setLoading(true);
     const ctx=buildProfileContext(profile);
     const macrosField=isPremium?`"calorias":"X kcal por porción","macros":{"Proteína":"Xg","Carbos":"Xg","Grasa":"Xg"},`:"";
     try{
-      const r=await callAI(`Eres chef experto.${ctx} Receta completa de: "${opt.nombre}". Usa: ${ingredients.join(", ")}. Para: ${persons}.
+      const r=await callAI(`Eres chef experto.${ctx} Receta completa de: "${opt.nombre}". Usa principalmente: ${ingredients.join(", ")}. Para: ${persons}.
 Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${persons}","personas":"${persons}","dificultad":"${opt.dificultad}","cocina":"",${macrosField}"ingredientes":[],"ingredientes_faltantes":[],"pasos":[],"tip":""}`);
-      setRecipe(r);
-      recipeUtils.addToHistory(r);
-      increment();
-    }catch{setError("No se pudo generar la receta. Intenta de nuevo.");}
+      if(r&&r.nombre){
+        setRecipe(r);
+        recipeUtils.addToHistory(r);
+        increment();
+      } else {
+        setError("No se pudo generar la receta. Intenta de nuevo.");
+      }
+    }catch(e){
+      console.error("selectOption error:", e);
+      setError("No se pudo generar la receta. Intenta de nuevo.");
+    }
     finally{setLoading(false);}
   };
 
@@ -614,17 +646,25 @@ Dame 3 opciones de recetas. Responde SOLO JSON sin backticks:
 
   const selectOption=async(opt)=>{
     setOptions(null);
-    setLoading(true);
+    setRecipe(null);
     setError(null);
+    setLoading(true);
     const ctx=buildProfileContext(profile);
     const macrosField=isPremium?`"calorias":"X kcal por porción","macros":{"Proteína":"Xg","Carbos":"Xg","Grasa":"Xg"},`:"";
     try{
       const r=await callAI(`Eres chef experto.${ctx} Receta completa de: "${opt.nombre}". Para: ${persons}.
 Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${persons}","personas":"${persons}","dificultad":"${opt.dificultad}","cocina":"",${macrosField}"ingredientes":[],"ingredientes_faltantes":[],"pasos":[],"tip":""}`);
-      setRecipe(r);
-      recipeUtils.addToHistory(r);
-      increment();
-    }catch{setError("No se pudo generar la receta.");}
+      if(r&&r.nombre){
+        setRecipe(r);
+        recipeUtils.addToHistory(r);
+        increment();
+      } else {
+        setError("No se pudo generar la receta. Intenta de nuevo.");
+      }
+    }catch(e){
+      console.error("selectOption error:", e);
+      setError("No se pudo generar la receta. Intenta de nuevo.");
+    }
     finally{setLoading(false);}
   };
 
@@ -1121,6 +1161,7 @@ export default function App() {
   const [profile,setProfile]=useState(DEFAULT_PROFILE);
   const [isPremium,setIsPremium]=useState(false);
   const [pendingListItems,setPendingListItems]=useState([]);
+  const [activeRecipe,setActiveRecipe]=useState(null);
   const [darkMode,setDarkMode]=useState(true);
   const C=darkMode?DARK:LIGHT;
   const uid=user?.uid||null;
@@ -1149,9 +1190,13 @@ export default function App() {
   // Pantalla de login
   if(!user)return<LoginScreen C={C}/>;
 
-  const handleAddToList=(ingredients)=>{
+  const handleAddToList=(ingredients, recipe=null)=>{
+    if(recipe) setActiveRecipe(recipe);
     setPendingListItems(ingredients||[]);setOverlay("lista");
     toast("📝 Abriendo tu lista del súper...");
+  };
+  const handleCloseOverlay=()=>{
+    setOverlay(null);
   };
   const openOverlay=(name)=>setOverlay(overlay===name?null:name);
 
