@@ -58,14 +58,22 @@ async function callAI(prompt, imageBase64=null) {
 }
 
 async function fetchFoodImage(query) {
+  const key = import.meta.env.VITE_UNSPLASH_KEY;
+  if(!key) return null;
   try {
-    const q = encodeURIComponent(query + " comida platillo");
-    const res = await fetch(`https://api.unsplash.com/search/photos?query=${q}&per_page=3&orientation=landscape&client_id=${import.meta.env.VITE_UNSPLASH_KEY}`);
+    const q = encodeURIComponent(query + " food");
+    const res = await fetch(
+      `https://api.unsplash.com/search/photos?query=${q}&per_page=1&orientation=landscape`,
+      { headers: { "Authorization": `Client-ID ${key}` } }
+    );
     if(!res.ok) return null;
     const data = await res.json();
     if(data.results?.length>0) return data.results[0].urls?.regular || null;
-    // Fallback: búsqueda genérica de comida
-    const res2 = await fetch(`https://api.unsplash.com/search/photos?query=mexican+food+dish&per_page=1&orientation=landscape&client_id=${import.meta.env.VITE_UNSPLASH_KEY}`);
+    // Fallback
+    const res2 = await fetch(
+      `https://api.unsplash.com/search/photos?query=food+dish&per_page=1&orientation=landscape`,
+      { headers: { "Authorization": `Client-ID ${key}` } }
+    );
     if(!res2.ok) return null;
     const data2 = await res2.json();
     return data2.results?.[0]?.urls?.regular || null;
@@ -172,23 +180,27 @@ function StepTimer({step,C}) {
   const fmt=s=>`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
   const reset=()=>{clearInterval(ref.current);setSeconds(0);setRunning(false);setDone(false);};
   return(
-    <div style={{background:C.greenFaint,border:`1px solid ${C.borderLight}`,borderRadius:"12px",padding:"14px 16px",marginTop:"10px"}}>
-      <div style={{display:"flex",alignItems:"center",gap:"12px",marginBottom:"10px"}}>
-        <span style={{fontSize:"1.2rem"}}>⏱</span>
-        <div style={{fontSize:"1.6rem",fontWeight:"bold",color:done?C.accent:C.green,fontFamily:"Georgia,serif",letterSpacing:"2px"}}>
-          {fmt(left>0?left:0)}
-        </div>
-        {done&&<span style={{fontSize:"0.85rem",color:C.accent,fontWeight:"bold"}}>✅ ¡Listo!</span>}
-      </div>
-      <div style={{background:C.border,borderRadius:"6px",height:"8px",overflow:"hidden",marginBottom:"12px"}}>
-        <div style={{background:done?C.accent:C.green,height:"100%",width:`${pct}%`,transition:"width 1s linear",borderRadius:"6px"}}/>
-      </div>
-      <div style={{display:"flex",gap:"8px"}}>
-        <button onClick={()=>setRunning(r=>!r)} disabled={done} style={{flex:2,background:running?C.accentDim:C.borderLight,border:`1px solid ${running?C.accent:C.borderLight}`,borderRadius:"8px",color:running?C.accent:C.green,cursor:done?"not-allowed":"pointer",fontSize:"0.9rem",fontWeight:"bold",padding:"8px 12px",fontFamily:"Georgia,serif"}}>
-          {running?"⏸ Pausar":"▶ Iniciar"}
+    <div style={{background:C.greenFaint,border:`1px solid ${C.borderLight}`,borderRadius:"14px",padding:"14px 16px",marginTop:"10px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:"14px"}}>
+        {/* Botón play/pause redondo */}
+        <button onClick={()=>setRunning(r=>!r)} disabled={done}
+          style={{width:"48px",height:"48px",borderRadius:"50%",border:"none",background:done?C.border:running?C.accent:C.green,color:"#fff",fontSize:"1.2rem",cursor:done?"not-allowed":"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 2px 8px ${done?C.border:running?C.accent+"60":C.green+"60"}`}}>
+          {done?"✓":running?"⏸":"▶"}
         </button>
-        <button onClick={reset} style={{flex:1,background:"transparent",border:`1px solid ${C.border}`,borderRadius:"8px",color:C.textDim,cursor:"pointer",fontSize:"0.9rem",padding:"8px 12px",fontFamily:"Georgia,serif"}}>
-          🔄 Reiniciar
+        {/* Tiempo y barra */}
+        <div style={{flex:1}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"6px"}}>
+            <span style={{fontSize:"1.4rem",fontWeight:"bold",color:done?C.accent:C.green,fontFamily:"Georgia,serif",letterSpacing:"2px"}}>{fmt(left>0?left:0)}</span>
+            {done&&<span style={{fontSize:"0.8rem",color:C.accent,fontWeight:"bold"}}>✅ ¡Listo!</span>}
+          </div>
+          <div style={{background:C.border,borderRadius:"6px",height:"6px",overflow:"hidden"}}>
+            <div style={{background:done?C.accent:C.green,height:"100%",width:`${pct}%`,transition:"width 1s linear",borderRadius:"6px"}}/>
+          </div>
+        </div>
+        {/* Botón reiniciar redondo */}
+        <button onClick={reset}
+          style={{width:"36px",height:"36px",borderRadius:"50%",border:`1px solid ${C.border}`,background:"transparent",color:C.textDim,fontSize:"0.9rem",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+          🔄
         </button>
       </div>
     </div>
