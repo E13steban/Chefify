@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, startTransition } from "react";
 import { initializeApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile, sendPasswordResetEmail } from "firebase/auth";
 import { getFirestore, doc, setDoc, getDoc, collection, getDocs, deleteDoc } from "firebase/firestore";
@@ -530,11 +530,13 @@ Dame 3 opciones de recetas. Responde SOLO JSON sin backticks:
 Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${persons}","personas":"${persons}","dificultad":"${opt.dificultad}","cocina":"",${macrosField}"ingredientes":[],"ingredientes_faltantes":[],"pasos":[],"tip":""}`)
     .then(r=>{
       if(r&&r.nombre){
-        setOptions(null);
-        setRecipe(r);
-        setScreen("recipe");
         recipeUtils.addToHistory(r);
         increment();
+        startTransition(()=>{
+          setRecipe(r);
+          setOptions(null);
+          setScreen("recipe");
+        });
       } else {
         setError("No se pudo generar la receta. Intenta de nuevo.");
         setScreen("options");
@@ -547,7 +549,12 @@ Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${person
     });
   };
 
-  const reset=()=>{setRecipe(null);setOptions(null);setError(null);setScreen("form");};
+  const reset=()=>{
+    setScreen("form");
+    setRecipe(null);
+    setOptions(null);
+    setError(null);
+  };
   const main={maxWidth:"600px",margin:"0 auto",padding:"20px 16px"};
   const inp={flex:1,background:C.inputBg,border:`1px solid ${C.border}`,borderRadius:"10px",color:C.text,fontSize:"0.95rem",padding:"11px 14px",outline:"none",fontFamily:"Georgia,serif"};
 
@@ -662,11 +669,13 @@ Dame 3 opciones de recetas. Responde SOLO JSON sin backticks:
 Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${persons}","personas":"${persons}","dificultad":"${opt.dificultad}","cocina":"",${macrosField}"ingredientes":[],"ingredientes_faltantes":[],"pasos":[],"tip":""}`)
     .then(r=>{
       if(r&&r.nombre){
-        setOptions(null);
-        setRecipe(r);
-        setScreen("recipe");
         recipeUtils.addToHistory(r);
         increment();
+        startTransition(()=>{
+          setRecipe(r);
+          setOptions(null);
+          setScreen("recipe");
+        });
       } else {
         setError("No se pudo generar la receta. Intenta de nuevo.");
         setScreen("options");
