@@ -323,9 +323,9 @@ function RecipeCard({recipe,onReset,isPremium,onSaveFavorite,isFavorite,onAddToL
   const [imgLoading,setImgLoading]=useState(true);
 
   useEffect(()=>{
-    if(recipe.nombre){
-      fetchFoodImage(recipe.nombre).then(url=>{setImgUrl(url);setImgLoading(false);});
-    }
+    // Images temporarily disabled to test white screen bug
+    setImgLoading(false);
+    setImgUrl(null);
   },[recipe.nombre]);
 
   const share=()=>{
