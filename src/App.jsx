@@ -324,18 +324,24 @@ function RecipeCard({recipe,onReset,isPremium,onSaveFavorite,isFavorite,onAddToL
 
   useEffect(()=>{
     if(!recipe.nombre)return;
+    let cancelled=false;
     setImgLoading(true);
     setImgUrl(null);
-    // Delay image loading so recipe renders first
-    const timer = setTimeout(()=>{
-      fetchFoodImage(recipe.nombre)
-        .then(url=>{
-          setImgUrl(url);
-          setImgLoading(false);
-        })
-        .catch(()=>setImgLoading(false));
-    }, 800);
-    return ()=>clearTimeout(timer);
+    // Wait for recipe to fully render, then load image
+    requestAnimationFrame(()=>{
+      requestAnimationFrame(()=>{
+        fetchFoodImage(recipe.nombre).then(url=>{
+          if(cancelled)return;
+          if(!url){setImgLoading(false);return;}
+          // Preload image completely before showing
+          const img=new Image();
+          img.onload=()=>{ if(!cancelled){setImgUrl(url);setImgLoading(false);} };
+          img.onerror=()=>{ if(!cancelled)setImgLoading(false); };
+          img.src=url;
+        }).catch(()=>{ if(!cancelled)setImgLoading(false); });
+      });
+    });
+    return()=>{ cancelled=true; };
   },[recipe.nombre]);
 
   const share=()=>{
