@@ -207,6 +207,41 @@ function StepTimer({step,C}) {
   );
 }
 
+// ─── RECIPE IMAGE (independiente de RecipeCard) ──────────────────────────────
+function RecipeImage({nombre, C}) {
+  const [imgUrl, setImgUrl] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(()=>{
+    if(!nombre) return;
+    let cancelled = false;
+    const timer = setTimeout(async()=>{
+      try {
+        const url = await fetchFoodImage(nombre);
+        if(!cancelled && url) setImgUrl(url);
+      } catch {}
+    }, 300);
+    return ()=>{ cancelled=true; clearTimeout(timer); };
+  },[nombre]);
+
+  if(!imgUrl) return(
+    <div style={{width:"100%",height:"200px",background:`linear-gradient(135deg,${C.greenFaint},${C.card})`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"3.5rem"}}>🍳</div>
+  );
+
+  return(
+    <div style={{width:"100%",height:"200px",overflow:"hidden",background:C.greenFaint}}>
+      <img
+        src={imgUrl}
+        alt={nombre}
+        style={{width:"100%",height:"100%",objectFit:"cover",display:loaded?"block":"none"}}
+        onLoad={()=>setLoaded(true)}
+        onError={()=>setImgUrl(null)}
+      />
+      {!loaded&&<div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"3.5rem"}}>🍳</div>}
+    </div>
+  );
+}
+
 // ─── LOGIN SCREEN ─────────────────────────────────────────────────────────────
 function LoginScreen({C}) {
   const [email,setEmail]=useState("");
@@ -319,30 +354,6 @@ const RecipeOptions=({options,onSelect,onBack,C})=>{
 function RecipeCard({recipe,onReset,isPremium,onSaveFavorite,isFavorite,onAddToList,C}) {
   const [copied,setCopied]=useState(false);
   const [addedToList,setAddedToList]=useState(false);
-  const [imgUrl,setImgUrl]=useState(null);
-  const [imgLoading,setImgLoading]=useState(true);
-
-  useEffect(()=>{
-    if(!recipe.nombre)return;
-    let cancelled=false;
-    setImgLoading(true);
-    setImgUrl(null);
-    // Wait for recipe to fully render, then load image
-    requestAnimationFrame(()=>{
-      requestAnimationFrame(()=>{
-        fetchFoodImage(recipe.nombre).then(url=>{
-          if(cancelled)return;
-          if(!url){setImgLoading(false);return;}
-          // Preload image completely before showing
-          const img=new Image();
-          img.onload=()=>{ if(!cancelled){setImgUrl(url);setImgLoading(false);} };
-          img.onerror=()=>{ if(!cancelled)setImgLoading(false); };
-          img.src=url;
-        }).catch(()=>{ if(!cancelled)setImgLoading(false); });
-      });
-    });
-    return()=>{ cancelled=true; };
-  },[recipe.nombre]);
 
   const share=()=>{
     const text=`🍳 *${recipe.nombre}* — Chefify\n\nIngredientes: ${recipe.ingredientes?.join(", ")}\n\nhttps://chefify-phi.vercel.app`;
@@ -360,14 +371,7 @@ function RecipeCard({recipe,onReset,isPremium,onSaveFavorite,isFavorite,onAddToL
 
   return(<>
     <div style={{background:C.card,border:`1px solid ${C.border}`,borderRadius:"16px",overflow:"hidden",marginBottom:"16px"}}>
-      <div style={{width:"100%",height:"200px",background:C.greenFaint,overflow:"hidden",position:"relative"}}>
-        {imgLoading&&<div style={{position:"absolute",inset:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:"2rem",color:C.textDim}}>⏳</div>}
-        {imgUrl?(
-          <img src={imgUrl} alt={recipe.nombre} style={{width:"100%",height:"100%",objectFit:"cover",display:imgLoading?"none":"block"}} onLoad={()=>setImgLoading(false)} onError={()=>{setImgUrl(null);setImgLoading(false);}}/>
-        ):(
-          !imgLoading&&<div style={{width:"100%",height:"100%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"3.5rem"}}>🍳</div>
-        )}
-      </div>
+      <RecipeImage nombre={recipe.nombre} C={C}/>
       <div style={{padding:"20px"}}>
         <div style={{fontSize:"1.3rem",fontWeight:"bold",color:C.green,marginBottom:"6px"}}>{recipe.nombre}</div>
         <div style={{display:"flex",gap:"8px",flexWrap:"wrap",marginBottom:"12px"}}>
