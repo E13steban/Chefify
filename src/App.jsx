@@ -182,7 +182,7 @@ function StepTimer({step,C}) {
   return(
     <div style={{background:C.greenFaint,border:`1px solid ${C.borderLight}`,borderRadius:"14px",padding:"14px 16px",marginTop:"10px"}}>
       <div style={{display:"flex",alignItems:"center",gap:"14px"}}>
-        {/* Botón play/pause redondo */}
+        {/* Botón play/pause redondo izquierda */}
         <button onClick={()=>setRunning(r=>!r)} disabled={done}
           style={{width:"48px",height:"48px",borderRadius:"50%",border:"none",background:done?C.border:running?C.accent:C.green,color:"#fff",fontSize:"1.2rem",cursor:done?"not-allowed":"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 2px 8px ${done?C.border:running?C.accent+"60":C.green+"60"}`}}>
           {done?"✓":running?"⏸":"▶"}
@@ -197,10 +197,10 @@ function StepTimer({step,C}) {
             <div style={{background:done?C.accent:C.green,height:"100%",width:`${pct}%`,transition:"width 1s linear",borderRadius:"6px"}}/>
           </div>
         </div>
-        {/* Botón reiniciar redondo */}
+        {/* Botón reiniciar redondo derecha - igual tamaño que play */}
         <button onClick={reset}
-          style={{width:"36px",height:"36px",borderRadius:"50%",border:`1px solid ${C.border}`,background:"transparent",color:C.textDim,fontSize:"0.9rem",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
-          🔄
+          style={{width:"48px",height:"48px",borderRadius:"50%",border:"none",background:C.borderLight,color:C.green,fontSize:"1.2rem",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",boxShadow:`0 2px 8px ${C.borderLight}60`}}>
+          ↺
         </button>
       </div>
     </div>
@@ -280,7 +280,7 @@ function LoginScreen({C}) {
 }
 
 // ─── RECIPE OPTIONS ───────────────────────────────────────────────────────────
-function RecipeOptions({options,onSelect,onBack,C}) {
+const RecipeOptions=({options,onSelect,onBack,C})=>{
   const [selectedIdx,setSelectedIdx]=useState(null);
   const handleSelect=(opt,i)=>{
     if(selectedIdx!==null)return;
@@ -313,7 +313,7 @@ function RecipeOptions({options,onSelect,onBack,C}) {
       {selectedIdx===null&&<button style={{width:"100%",background:"transparent",border:`1px solid ${C.border}`,borderRadius:"12px",color:C.textDim,cursor:"pointer",fontSize:"0.88rem",padding:"11px",fontFamily:"Georgia,serif",marginTop:"4px"}} onClick={onBack}>↩ Volver</button>}
     </div>
   );
-}
+};
 
 // ─── RECIPE CARD ─────────────────────────────────────────────────────────────
 function RecipeCard({recipe,onReset,isPremium,onSaveFavorite,isFavorite,onAddToList,C}) {
@@ -571,8 +571,10 @@ Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${person
   const inp={flex:1,background:C.inputBg,border:`1px solid ${C.border}`,borderRadius:"10px",color:C.text,fontSize:"0.95rem",padding:"11px 14px",outline:"none",fontFamily:"Georgia,serif"};
 
   if(screen==="recipe"&&recipe)return<div style={main}><RecipeCard recipe={recipe} onReset={reset} isPremium={isPremium} onSaveFavorite={recipeUtils.saveFavorite} isFavorite={recipeUtils.isFavorite(recipe)} onAddToList={onAddToList} C={C}/></div>;
-  if(screen==="options"&&options)return<RecipeOptions options={options} onSelect={selectOption} onBack={()=>setScreen("form")} C={C}/>;
-  if(screen==="loading")return<div style={{...main,textAlign:"center",paddingTop:"60px"}}><div style={{fontSize:"2.5rem",marginBottom:"12px"}}>👨‍🍳</div><p style={{color:C.textMuted}}>El chef está pensando...</p></div>;
+  if(screen==="options"||screen==="loading"){
+    if(options)return<RecipeOptions options={options} onSelect={selectOption} onBack={()=>setScreen("form")} C={C}/>;
+    return<div style={{...main,textAlign:"center",paddingTop:"60px"}}><div style={{fontSize:"2.5rem",marginBottom:"12px"}}>👨‍🍳</div><p style={{color:C.textMuted}}>El chef está pensando...</p></div>;
+  }
 
   if(cameraOpen)return(
     <div style={main}>
@@ -705,8 +707,10 @@ Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${person
   const inp={width:"100%",background:C.inputBg,border:`1px solid ${C.border}`,borderRadius:"10px",color:C.text,fontSize:"0.95rem",padding:"11px 14px",outline:"none",fontFamily:"Georgia,serif",boxSizing:"border-box"};
 
   if(screen==="recipe"&&recipe)return<div style={main}><RecipeCard recipe={recipe} onReset={reset} isPremium={isPremium} onSaveFavorite={recipeUtils.saveFavorite} isFavorite={recipeUtils.isFavorite(recipe)} onAddToList={onAddToList} C={C}/></div>;
-  if(screen==="options"&&options)return<RecipeOptions options={options} onSelect={selectOption} onBack={()=>setScreen("form")} C={C}/>;
-  if(screen==="loading")return<div style={{...main,textAlign:"center",paddingTop:"60px"}}><div style={{fontSize:"2.5rem",marginBottom:"12px"}}>📖</div><p style={{color:C.textMuted}}>Buscando recetas...</p></div>;
+  if(screen==="options"||screen==="loading"){
+    if(options)return<RecipeOptions options={options} onSelect={selectOption} onBack={()=>setScreen("form")} C={C}/>;
+    return<div style={{...main,textAlign:"center",paddingTop:"60px"}}><div style={{fontSize:"2.5rem",marginBottom:"12px"}}>📖</div><p style={{color:C.textMuted}}>Buscando recetas...</p></div>;
+  }
 
   return(
     <div style={main}>
