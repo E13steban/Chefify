@@ -570,11 +570,22 @@ Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${person
   const main={maxWidth:"600px",margin:"0 auto",padding:"20px 16px"};
   const inp={flex:1,background:C.inputBg,border:`1px solid ${C.border}`,borderRadius:"10px",color:C.text,fontSize:"0.95rem",padding:"11px 14px",outline:"none",fontFamily:"Georgia,serif"};
 
-  if(screen==="recipe"&&recipe)return<div style={main}><RecipeCard recipe={recipe} onReset={reset} isPremium={isPremium} onSaveFavorite={recipeUtils.saveFavorite} isFavorite={recipeUtils.isFavorite(recipe)} onAddToList={onAddToList} C={C}/></div>;
-  if(screen==="options"||screen==="loading"){
-    if(options)return<RecipeOptions options={options} onSelect={selectOption} onBack={()=>setScreen("form")} C={C}/>;
-    return<div style={{...main,textAlign:"center",paddingTop:"60px"}}><div style={{fontSize:"2.5rem",marginBottom:"12px"}}>👨‍🍳</div><p style={{color:C.textMuted}}>El chef está pensando...</p></div>;
-  }
+  // Un solo return - nunca cambia de componente, solo muestra/oculta contenido
+  if(screen!=="form"&&screen!=="camera")return(
+    <div style={main}>
+      {screen==="recipe"&&recipe&&<RecipeCard recipe={recipe} onReset={reset} isPremium={isPremium} onSaveFavorite={recipeUtils.saveFavorite} isFavorite={recipeUtils.isFavorite(recipe)} onAddToList={onAddToList} C={C}/>}
+      {(screen==="options"||screen==="loading")&&(
+        options?(
+          <RecipeOptions options={options} onSelect={selectOption} onBack={()=>setScreen("form")} C={C}/>
+        ):(
+          <div style={{textAlign:"center",paddingTop:"60px"}}>
+            <div style={{fontSize:"2.5rem",marginBottom:"12px"}}>👨‍🍳</div>
+            <p style={{color:C.textMuted}}>El chef está pensando...</p>
+          </div>
+        )
+      )}
+    </div>
+  );
 
   if(cameraOpen)return(
     <div style={main}>
@@ -706,11 +717,21 @@ Responde SOLO JSON sin backticks: {"nombre":"","tiempo":"","porciones":"${person
   const main={maxWidth:"600px",margin:"0 auto",padding:"20px 16px"};
   const inp={width:"100%",background:C.inputBg,border:`1px solid ${C.border}`,borderRadius:"10px",color:C.text,fontSize:"0.95rem",padding:"11px 14px",outline:"none",fontFamily:"Georgia,serif",boxSizing:"border-box"};
 
-  if(screen==="recipe"&&recipe)return<div style={main}><RecipeCard recipe={recipe} onReset={reset} isPremium={isPremium} onSaveFavorite={recipeUtils.saveFavorite} isFavorite={recipeUtils.isFavorite(recipe)} onAddToList={onAddToList} C={C}/></div>;
-  if(screen==="options"||screen==="loading"){
-    if(options)return<RecipeOptions options={options} onSelect={selectOption} onBack={()=>setScreen("form")} C={C}/>;
-    return<div style={{...main,textAlign:"center",paddingTop:"60px"}}><div style={{fontSize:"2.5rem",marginBottom:"12px"}}>📖</div><p style={{color:C.textMuted}}>Buscando recetas...</p></div>;
-  }
+  if(screen!=="form")return(
+    <div style={main}>
+      {screen==="recipe"&&recipe&&<RecipeCard recipe={recipe} onReset={reset} isPremium={isPremium} onSaveFavorite={recipeUtils.saveFavorite} isFavorite={recipeUtils.isFavorite(recipe)} onAddToList={onAddToList} C={C}/>}
+      {(screen==="options"||screen==="loading")&&(
+        options?(
+          <RecipeOptions options={options} onSelect={selectOption} onBack={()=>setScreen("form")} C={C}/>
+        ):(
+          <div style={{textAlign:"center",paddingTop:"60px"}}>
+            <div style={{fontSize:"2.5rem",marginBottom:"12px"}}>📖</div>
+            <p style={{color:C.textMuted}}>Buscando recetas...</p>
+          </div>
+        )
+      )}
+    </div>
+  );
 
   return(
     <div style={main}>
