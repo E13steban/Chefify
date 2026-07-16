@@ -323,9 +323,19 @@ function RecipeCard({recipe,onReset,isPremium,onSaveFavorite,isFavorite,onAddToL
   const [imgLoading,setImgLoading]=useState(true);
 
   useEffect(()=>{
-    // Images temporarily disabled to test white screen bug
-    setImgLoading(false);
+    if(!recipe.nombre)return;
+    setImgLoading(true);
     setImgUrl(null);
+    // Delay image loading so recipe renders first
+    const timer = setTimeout(()=>{
+      fetchFoodImage(recipe.nombre)
+        .then(url=>{
+          setImgUrl(url);
+          setImgLoading(false);
+        })
+        .catch(()=>setImgLoading(false));
+    }, 800);
+    return ()=>clearTimeout(timer);
   },[recipe.nombre]);
 
   const share=()=>{
